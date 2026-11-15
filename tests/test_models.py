@@ -1,0 +1,41 @@
+"""Small actual training round trip; the full IBM benchmark is intentionally separate."""
+import csv
+from datetime import datetime, timedelta
+
+import pytest
+
+pytest.importorskip('torch')
+pytest.importorskip('polars')
+pytest.importorskip('xgboost')
+
+from dolos.inference import score
+from dolos.model import run, IBM_HEADER
+from dolos.parsers import parse_document
+
+
+def test_training_export_and_serving_use_identical_features(tmp_path):
+    import numpy as np
+    import polars as pl
+    fixture = tmp_path / 'fixture.csv'
+    start = datetime(2022, 9, 1)
+    with fixture.open('w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(IBM_HEADER)
+        for i in range(720):
+            writer.writerow([(start + timedelta(minutes=i // 3)).strftime('%Y/%m/%d %H:%M'),
+                             '001', f'{i % 13:04x}', '002', f'{i % 17:04x}', i + 1,
+                             'US Dollar', i + 1, 'US Dollar', 'ACH', int(i % 17 == 0)])
+    artifacts = tmp_path / 'model'
+    run(fixture, artifacts, epochs=1, batch_size=128)
+    rows = [dict(row, id=f'tx-{index:04d}') for index, row, error in parse_document(fixture, '.csv')]
+    for name in ('graph_xgboost', 'transaction_xgboost', 'graphsage', 'graphsage_no_neighbors'):
+        expected = pl.read_parquet(artifacts / (name + '.parquet'))['score'].to_numpy()
+        actual = score(rows, artifacts, name, 1000)
+        by_id = {r['transaction_id']: r['score'] for r in actual['scores']}
+        ordered = [by_id[r['id']] for r in rows[-len(expected):]]
+        np.testing.assert_allclose(ordered, expected, atol=1e-5, rtol=1e-5)
+        # Same-hour and future transfers must not influence earlier scores.
+        future = dict(rows[-1], id='future', timestamp='2023-01-01T00:00:00.000000+00:00', amount_paid='999999')
+        changed = score(rows + [future], artifacts, name, 1000)
+        changed_by_id = {r['transaction_id']: r['score'] for r in changed['scores']}
+        np.testing.assert_allclose([changed_by_id[k] for k in by_id], list(by_id.values()), atol=1e-5)

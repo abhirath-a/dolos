@@ -1,0 +1,4 @@
+timestamp,from_bank,from_account,to_bank,to_account,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,reference
+2026-11-01T09:00:00Z,001,000123,002,000456,125.50,USD,125.50,USD,ACH,transfer-001
+2026-11-01T10:15:00Z,002,000456,003,000789,100.00,USD,100.00,USD,WIRE,transfer-002
+2026-11-01T10:15:00Z,002,000456,003,000789,100.00,USD,100.00,USD,WIRE,transfer-003

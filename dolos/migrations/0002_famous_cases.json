@@ -1,0 +1,959 @@
+{
+  "schema_version": 1,
+  "dataset_id": "famous-cases-v1",
+  "researched_on": "2026-11-15",
+  "representation": "curated_public_source_case_graph",
+  "notes": [
+    "Not bank statements, a complete transaction ledger, or an AML training set.",
+    "No invented account numbers, transfer timestamps, amounts, or historical transactions.",
+    "Cohort, method, and category nodes are analytical groupings, not identified accounts.",
+    "Evidence status is tied to the cited source and publication date, not a comprehensive current legal-status check.",
+    "Never sum edge amounts into case losses: aggregates, single transfers, currencies, and overlapping flows coexist."
+  ],
+  "sources": [
+    {
+      "id": "capone-fbi",
+      "title": "Al Capone — FBI history",
+      "publisher": "FBI",
+      "url": "https://www.fbi.gov/history/cases-and-criminals/al-capone",
+      "published": null,
+      "accessed": "2026-11-15"
+    },
+    {
+      "id": "capone-archives",
+      "title": "Al Capone’s Guilty Verdict",
+      "publisher": "U.S. National Archives",
+      "url": "https://www.archives.gov/chicago/highlights/capone",
+      "published": null,
+      "accessed": "2026-11-15"
+    },
+    {
+      "id": "1mdb-complaint",
+      "title": "United States v. Beverly Hills property — verified forfeiture complaint",
+      "publisher": "U.S. Department of Justice",
+      "url": "https://www.justice.gov/opa/file/879426/dl?inline=",
+      "published": "2016-07-20",
+      "accessed": "2026-11-15"
+    },
+    {
+      "id": "hsbc-doj",
+      "title": "HSBC admits AML and sanctions violations",
+      "publisher": "U.S. Department of Justice",
+      "url": "https://www.justice.gov/archives/opa/pr/hsbc-holdings-plc-and-hsbc-bank-usa-na-admit-anti-money-laundering-and-sanctions-violations",
+      "published": "2012-12-11",
+      "accessed": "2026-11-15"
+    },
+    {
+      "id": "liberty-doj",
+      "title": "Liberty Reserve founder sentenced",
+      "publisher": "U.S. Department of Justice",
+      "url": "https://www.justice.gov/usao-sdny/pr/liberty-reserve-founder-arthur-budovsky-sentenced-manhattan-federal-court-20-years",
+      "published": "2016-05-06",
+      "accessed": "2026-11-15"
+    },
+    {
+      "id": "onecoin-doj",
+      "title": "OneCoin co-founder sentenced",
+      "publisher": "U.S. Department of Justice",
+      "url": "https://www.justice.gov/usao-sdny/pr/co-founder-multibillion-dollar-cryptocurrency-scheme-onecoin-sentenced-20-years-prison",
+      "published": "2023-09-12",
+      "accessed": "2026-11-15"
+    },
+    {
+      "id": "bitfinex-doj",
+      "title": "Bitfinex hacker sentenced",
+      "publisher": "U.S. Department of Justice",
+      "url": "https://www.justice.gov/archives/opa/pr/bitfinex-hacker-sentenced-money-laundering-conspiracy-involving-billions-stolen",
+      "published": "2024-11-14",
+      "accessed": "2026-11-15"
+    }
+  ],
+  "cases": [
+    {
+      "id": "al-capone",
+      "title": "Al Capone: the tax trail",
+      "hook": "The gangster undone by his tax records.",
+      "period": "1920s–1931",
+      "summary": "Criminal enterprises, legitimate business interests, and a tax-evasion verdict.",
+      "caveat": "Historical context, not an established laundering conviction or a documented transfer trail. The selected records do not establish the laundromat-origin story.",
+      "source_ids": [
+        "capone-fbi",
+        "capone-archives"
+      ],
+      "nodes": [
+        {
+          "id": "al-capone:capone",
+          "label": "Al Capone",
+          "kind": "person"
+        },
+        {
+          "id": "al-capone:gang",
+          "label": "Capone’s Chicago gang",
+          "kind": "organization"
+        },
+        {
+          "id": "al-capone:bootlegging",
+          "label": "Bootlegging operations",
+          "kind": "activity"
+        },
+        {
+          "id": "al-capone:gambling",
+          "label": "Gambling operations",
+          "kind": "activity"
+        },
+        {
+          "id": "al-capone:cleaning",
+          "label": "Cleaning and dyeing businesses",
+          "kind": "business_category"
+        },
+        {
+          "id": "al-capone:tax",
+          "label": "Federal tax-evasion case",
+          "kind": "legal_proceeding"
+        }
+      ],
+      "edges": [
+        {
+          "id": "al-capone:edge:1",
+          "source": "al-capone:capone",
+          "target": "al-capone:gang",
+          "relation": "led",
+          "description": "Capone assumed leadership in 1925.",
+          "evidence_status": "documented_historical_context",
+          "citations": [
+            {
+              "source_id": "capone-fbi",
+              "locator": "Early Years"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "al-capone:edge:2",
+          "source": "al-capone:gang",
+          "target": "al-capone:bootlegging",
+          "relation": "operated",
+          "description": "The gang pursued illegal liquor businesses.",
+          "evidence_status": "documented_historical_context",
+          "citations": [
+            {
+              "source_id": "capone-fbi",
+              "locator": "Early Years"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "al-capone:edge:3",
+          "source": "al-capone:gang",
+          "target": "al-capone:gambling",
+          "relation": "operated",
+          "description": "Gambling formed part of the criminal enterprise.",
+          "evidence_status": "documented_historical_context",
+          "citations": [
+            {
+              "source_id": "capone-fbi",
+              "locator": "Opening historical overview"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "al-capone:edge:4",
+          "source": "al-capone:gang",
+          "target": "al-capone:cleaning",
+          "relation": "held_interests_in",
+          "description": "The mob also held legitimate business interests.",
+          "evidence_status": "documented_historical_context",
+          "citations": [
+            {
+              "source_id": "capone-fbi",
+              "locator": "Early Years"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "al-capone:edge:5",
+          "source": "al-capone:capone",
+          "target": "al-capone:tax",
+          "relation": "convicted_in",
+          "description": "A federal jury convicted Capone of tax evasion in 1931.",
+          "evidence_status": "documented_conviction",
+          "citations": [
+            {
+              "source_id": "capone-archives",
+              "locator": "Verdict description"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        }
+      ],
+      "metrics": []
+    },
+    {
+      "id": "1mdb",
+      "title": "1MDB: from sovereign fund to Hollywood",
+      "hook": "Follow the alleged money into The Wolf of Wall Street.",
+      "period": "2009–2013",
+      "summary": "A complaint traces fund diversions, beneficial control, and film financing.",
+      "caveat": "Edges preserve allegations in a 2016 civil complaint; they are not presented as adjudicated findings against every named party. Dates marked approximate mean on or about.",
+      "source_ids": [
+        "1mdb-complaint"
+      ],
+      "nodes": [
+        {
+          "id": "1mdb:fund",
+          "label": "1MDB",
+          "kind": "sovereign_fund"
+        },
+        {
+          "id": "1mdb:good-star",
+          "label": "Good Star account",
+          "kind": "account_label"
+        },
+        {
+          "id": "1mdb:jho-low",
+          "label": "Low Taek Jho (Jho Low)",
+          "kind": "person"
+        },
+        {
+          "id": "1mdb:red-granite",
+          "label": "Red Granite operating account",
+          "kind": "account_label"
+        },
+        {
+          "id": "1mdb:wolf",
+          "label": "The Wolf of Wall Street",
+          "kind": "film"
+        }
+      ],
+      "edges": [
+        {
+          "id": "1mdb:edge:1",
+          "source": "1mdb:fund",
+          "target": "1mdb:good-star",
+          "relation": "transfer",
+          "description": "Alleged diversion to Good Star.",
+          "evidence_status": "alleged_in_civil_complaint",
+          "citations": [
+            {
+              "source_id": "1mdb-complaint",
+              "locator": "p. 27, paragraph 79"
+            }
+          ],
+          "amount": "700000000",
+          "currency": "USD",
+          "amount_scope": "single_transfer",
+          "amount_qualifier": "exact_as_reported",
+          "event_date": "2009-09-30",
+          "date_qualifier": "on_or_about"
+        },
+        {
+          "id": "1mdb:edge:2",
+          "source": "1mdb:jho-low",
+          "target": "1mdb:good-star",
+          "relation": "beneficially_controlled",
+          "description": "Complaint identifies Low as beneficial owner and signatory.",
+          "evidence_status": "alleged_in_civil_complaint",
+          "citations": [
+            {
+              "source_id": "1mdb-complaint",
+              "locator": "p. 15, paragraphs 43–46"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "1mdb:edge:3",
+          "source": "1mdb:good-star",
+          "target": "1mdb:red-granite",
+          "relation": "transfer",
+          "description": "Alleged film-company advance.",
+          "evidence_status": "alleged_in_civil_complaint",
+          "citations": [
+            {
+              "source_id": "1mdb-complaint",
+              "locator": "p. 107, paragraphs 387–388"
+            }
+          ],
+          "amount": "1173104",
+          "currency": "USD",
+          "amount_scope": "single_transfer",
+          "amount_qualifier": "exact_as_reported",
+          "event_date": "2011-04-12",
+          "date_qualifier": "on_or_about"
+        },
+        {
+          "id": "1mdb:edge:4",
+          "source": "1mdb:good-star",
+          "target": "1mdb:red-granite",
+          "relation": "transfer",
+          "description": "Alleged additional movie advance.",
+          "evidence_status": "alleged_in_civil_complaint",
+          "citations": [
+            {
+              "source_id": "1mdb-complaint",
+              "locator": "p. 107, paragraph 388"
+            }
+          ],
+          "amount": "9000000",
+          "currency": "USD",
+          "amount_scope": "single_transfer",
+          "amount_qualifier": "approximately",
+          "event_date": "2012-09-10",
+          "date_qualifier": "on_or_about"
+        },
+        {
+          "id": "1mdb:edge:5",
+          "source": "1mdb:red-granite",
+          "target": "1mdb:wolf",
+          "relation": "financed",
+          "description": "Complaint traces diverted funds into production financing.",
+          "evidence_status": "alleged_in_civil_complaint",
+          "citations": [
+            {
+              "source_id": "1mdb-complaint",
+              "locator": "p. 107, paragraphs 385–388"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "summarized_multi_step_flow",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        }
+      ],
+      "metrics": []
+    },
+    {
+      "id": "hsbc",
+      "title": "HSBC: cartel cash meets correspondent banking",
+      "hook": "Two cartels and a global bank.",
+      "period": "2006–2010",
+      "summary": "Compliance failures enabled laundering of drug proceeds through HSBC Bank USA.",
+      "caveat": "The $881 million figure is a combined lower bound, not an amount assigned to either cartel. The resolution was a deferred prosecution agreement, not a trial conviction.",
+      "source_ids": [
+        "hsbc-doj"
+      ],
+      "nodes": [
+        {
+          "id": "hsbc:sinaloa",
+          "label": "Sinaloa Cartel",
+          "kind": "criminal_organization"
+        },
+        {
+          "id": "hsbc:norte",
+          "label": "Norte del Valle Cartel",
+          "kind": "criminal_organization"
+        },
+        {
+          "id": "hsbc:usa",
+          "label": "HSBC Bank USA",
+          "kind": "bank"
+        },
+        {
+          "id": "hsbc:mexico",
+          "label": "HSBC Mexico",
+          "kind": "bank"
+        },
+        {
+          "id": "hsbc:depositors",
+          "label": "Bulk-cash drug-trafficker depositors",
+          "kind": "cohort"
+        }
+      ],
+      "edges": [
+        {
+          "id": "hsbc:edge:1",
+          "source": "hsbc:sinaloa",
+          "target": "hsbc:usa",
+          "relation": "laundered_through",
+          "description": "Drug proceeds from this cartel passed through the bank.",
+          "evidence_status": "admitted_conduct_reported_by_doj",
+          "citations": [
+            {
+              "source_id": "hsbc-doj",
+              "locator": "The AML Investigation, final paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "aggregate_flow_unknown_share",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "hsbc:edge:2",
+          "source": "hsbc:norte",
+          "target": "hsbc:usa",
+          "relation": "laundered_through",
+          "description": "Drug proceeds from this cartel also passed through the bank.",
+          "evidence_status": "admitted_conduct_reported_by_doj",
+          "citations": [
+            {
+              "source_id": "hsbc-doj",
+              "locator": "The AML Investigation, final paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "aggregate_flow_unknown_share",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "hsbc:edge:3",
+          "source": "hsbc:depositors",
+          "target": "hsbc:mexico",
+          "relation": "deposited_cash_at",
+          "description": "Investigators identified bulk-currency deposits.",
+          "evidence_status": "court_record_reported",
+          "citations": [
+            {
+              "source_id": "hsbc-doj",
+              "locator": "The AML Investigation, BMPE paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "aggregate_flow",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "hsbc:edge:4",
+          "source": "hsbc:mexico",
+          "target": "hsbc:usa",
+          "relation": "correspondent_customer_of",
+          "description": "HSBC Mexico was a major correspondent customer.",
+          "evidence_status": "court_record_reported",
+          "citations": [
+            {
+              "source_id": "hsbc-doj",
+              "locator": "The AML Investigation, opening paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        }
+      ],
+      "metrics": [
+        {
+          "label": "Drug proceeds laundered through HSBC Bank USA",
+          "value": "881000000",
+          "upper_value": null,
+          "unit": "USD",
+          "qualifier": "at_least",
+          "scope": "combined_illicit_proceeds",
+          "citations": [
+            {
+              "source_id": "hsbc-doj",
+              "locator": "The AML Investigation, final paragraph"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "liberty-reserve",
+      "title": "Liberty Reserve: the anonymous digital hub",
+      "hook": "A payment network built to hide criminal proceeds.",
+      "period": "2005–2013",
+      "summary": "A digital-currency service catered to online criminal clients.",
+      "caveat": "Total platform volume is not the same as proven criminal proceeds. Cohorts summarize clientele rather than individual identified customers.",
+      "source_ids": [
+        "liberty-doj"
+      ],
+      "nodes": [
+        {
+          "id": "liberty-reserve:budovsky",
+          "label": "Arthur Budovsky",
+          "kind": "person"
+        },
+        {
+          "id": "liberty-reserve:platform",
+          "label": "Liberty Reserve",
+          "kind": "payment_platform"
+        },
+        {
+          "id": "liberty-reserve:hyip",
+          "label": "Online Ponzi / HYIP operators",
+          "kind": "cohort"
+        },
+        {
+          "id": "liberty-reserve:card",
+          "label": "Credit-card traffickers",
+          "kind": "cohort"
+        },
+        {
+          "id": "liberty-reserve:criminal",
+          "label": "Criminal-client proceeds",
+          "kind": "proceeds_pool"
+        }
+      ],
+      "edges": [
+        {
+          "id": "liberty-reserve:edge:1",
+          "source": "liberty-reserve:budovsky",
+          "target": "liberty-reserve:platform",
+          "relation": "operated",
+          "description": "Budovsky directed the platform.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "liberty-doj",
+              "locator": "Operations and ownership paragraphs"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "liberty-reserve:edge:2",
+          "source": "liberty-reserve:hyip",
+          "target": "liberty-reserve:platform",
+          "relation": "used",
+          "description": "Ponzi operators were among its criminal clientele.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "liberty-doj",
+              "locator": "Criminal-clientele discussion"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "liberty-reserve:edge:3",
+          "source": "liberty-reserve:card",
+          "target": "liberty-reserve:platform",
+          "relation": "used",
+          "description": "Credit-card traffickers used the network.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "liberty-doj",
+              "locator": "Financial hub for cybercriminals paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "liberty-reserve:edge:4",
+          "source": "liberty-reserve:criminal",
+          "target": "liberty-reserve:platform",
+          "relation": "laundered_through",
+          "description": "Budovsky admitted laundering a range of U.S.-account proceeds.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "liberty-doj",
+              "locator": "By May 2013 / plea-agreement paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "aggregate_flow",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        }
+      ],
+      "metrics": [
+        {
+          "label": "Total platform transaction volume",
+          "value": "8000000000",
+          "upper_value": null,
+          "unit": "USD",
+          "qualifier": "more_than",
+          "scope": "platform_volume_not_all_proven_illicit",
+          "citations": [
+            {
+              "source_id": "liberty-doj",
+              "locator": "By May 2013 paragraph"
+            }
+          ]
+        },
+        {
+          "label": "Admitted laundering linked to U.S. accounts",
+          "value": "250000000",
+          "upper_value": "550000000",
+          "unit": "USD",
+          "qualifier": "range",
+          "scope": "admitted_illicit_proceeds",
+          "citations": [
+            {
+              "source_id": "liberty-doj",
+              "locator": "Plea-agreement sentence"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "onecoin",
+      "title": "OneCoin: the Cryptoqueen’s paper empire",
+      "hook": "Investor money, commissions, and a yacht down payment.",
+      "period": "2014–2016 and later spending",
+      "summary": "A fake cryptocurrency sold through an international recruitment network.",
+      "caveat": "Investor receipts and commissions are aggregate figures, not individual wires. The graph reflects the 2023 sentencing account, not a current custody-status claim.",
+      "source_ids": [
+        "onecoin-doj"
+      ],
+      "nodes": [
+        {
+          "id": "onecoin:ignatova",
+          "label": "Ruja Ignatova (Cryptoqueen)",
+          "kind": "person"
+        },
+        {
+          "id": "onecoin:greenwood",
+          "label": "Karl Sebastian Greenwood",
+          "kind": "person"
+        },
+        {
+          "id": "onecoin:platform",
+          "label": "OneCoin",
+          "kind": "organization"
+        },
+        {
+          "id": "onecoin:investors",
+          "label": "OneCoin investor cohort",
+          "kind": "cohort"
+        },
+        {
+          "id": "onecoin:luxury",
+          "label": "Designer goods and watches",
+          "kind": "asset_category"
+        },
+        {
+          "id": "onecoin:yacht",
+          "label": "Sunseeker yacht down payment",
+          "kind": "asset_purchase"
+        }
+      ],
+      "edges": [
+        {
+          "id": "onecoin:edge:1",
+          "source": "onecoin:ignatova",
+          "target": "onecoin:platform",
+          "relation": "co_founded",
+          "description": "Ignatova co-founded the scheme.",
+          "evidence_status": "court_record_reported",
+          "citations": [
+            {
+              "source_id": "onecoin-doj",
+              "locator": "Public court filings, opening paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "onecoin:edge:2",
+          "source": "onecoin:greenwood",
+          "target": "onecoin:platform",
+          "relation": "co_founded",
+          "description": "Greenwood co-founded the scheme.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "onecoin-doj",
+              "locator": "Public court filings, opening paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "onecoin:edge:3",
+          "source": "onecoin:investors",
+          "target": "onecoin:platform",
+          "relation": "invested_in",
+          "description": "Investor receipts during Q4 2014–Q4 2016.",
+          "evidence_status": "court_record_reported",
+          "citations": [
+            {
+              "source_id": "onecoin-doj",
+              "locator": "Public court filings, opening paragraph"
+            }
+          ],
+          "amount": "4000000000",
+          "currency": "USD",
+          "amount_scope": "aggregate_investor_receipts",
+          "amount_qualifier": "more_than",
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "onecoin:edge:4",
+          "source": "onecoin:platform",
+          "target": "onecoin:greenwood",
+          "relation": "paid_commissions_to",
+          "description": "Aggregate commission earnings across the scheme.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "onecoin-doj",
+              "locator": "Lifestyle spending paragraph"
+            }
+          ],
+          "amount": "300000000",
+          "currency": "USD",
+          "amount_scope": "aggregate_commissions",
+          "amount_qualifier": "more_than",
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "onecoin:edge:5",
+          "source": "onecoin:greenwood",
+          "target": "onecoin:luxury",
+          "relation": "purchased",
+          "description": "Fraud proceeds bought luxury goods.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "onecoin-doj",
+              "locator": "Designer goods and yacht paragraph"
+            }
+          ],
+          "amount": "2000000",
+          "currency": "USD",
+          "amount_scope": "aggregate_purchases",
+          "amount_qualifier": "approximately",
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "onecoin:edge:6",
+          "source": "onecoin:greenwood",
+          "target": "onecoin:yacht",
+          "relation": "made_down_payment",
+          "description": "Fraud proceeds funded a yacht down payment.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "onecoin-doj",
+              "locator": "Designer goods and yacht paragraph"
+            }
+          ],
+          "amount": "475000",
+          "currency": "GBP",
+          "amount_scope": "purchase_down_payment",
+          "amount_qualifier": "approximately",
+          "event_date": null,
+          "date_qualifier": null
+        }
+      ],
+      "metrics": []
+    },
+    {
+      "id": "bitfinex",
+      "title": "Bitfinex: stolen bitcoin, mixers, and gold",
+      "hook": "A crypto theft with a physical-gold exit.",
+      "period": "2016–2022",
+      "summary": "Stolen bitcoin was obscured through multiple laundering techniques.",
+      "caveat": "The bitcoin quantity is a theft aggregate, not the amount successfully laundered. Method edges summarize routes and do not assert a direct one-hop wallet transfer.",
+      "source_ids": [
+        "bitfinex-doj"
+      ],
+      "nodes": [
+        {
+          "id": "bitfinex:exchange",
+          "label": "Bitfinex",
+          "kind": "exchange"
+        },
+        {
+          "id": "bitfinex:wallet",
+          "label": "Lichtenstein-controlled wallet",
+          "kind": "wallet_label"
+        },
+        {
+          "id": "bitfinex:ilya",
+          "label": "Ilya Lichtenstein",
+          "kind": "person"
+        },
+        {
+          "id": "bitfinex:heather",
+          "label": "Heather Morgan",
+          "kind": "person"
+        },
+        {
+          "id": "bitfinex:mixers",
+          "label": "Cryptocurrency mixing services",
+          "kind": "service_category"
+        },
+        {
+          "id": "bitfinex:gold",
+          "label": "Gold coins",
+          "kind": "asset_category"
+        }
+      ],
+      "edges": [
+        {
+          "id": "bitfinex:edge:1",
+          "source": "bitfinex:exchange",
+          "target": "bitfinex:wallet",
+          "relation": "stolen_transfers_to",
+          "description": "More than 2,000 unauthorized transfers moved bitcoin.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "bitfinex-doj",
+              "locator": "Hack and theft paragraph"
+            }
+          ],
+          "amount": "119754",
+          "currency": "BTC",
+          "amount_scope": "aggregate_theft",
+          "amount_qualifier": "exact_as_reported",
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "bitfinex:edge:2",
+          "source": "bitfinex:ilya",
+          "target": "bitfinex:wallet",
+          "relation": "controlled",
+          "description": "Lichtenstein controlled the destination wallet.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "bitfinex-doj",
+              "locator": "Hack and theft paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "bitfinex:edge:3",
+          "source": "bitfinex:ilya",
+          "target": "bitfinex:heather",
+          "relation": "conspired_with",
+          "description": "Both pleaded guilty to a laundering conspiracy.",
+          "evidence_status": "guilty_plea_reported",
+          "citations": [
+            {
+              "source_id": "bitfinex-doj",
+              "locator": "Plea paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "not_applicable",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "bitfinex:edge:4",
+          "source": "bitfinex:wallet",
+          "target": "bitfinex:mixers",
+          "relation": "laundering_route",
+          "description": "Some stolen proceeds entered mixing services.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "bitfinex-doj",
+              "locator": "Laundering techniques paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "summarized_multi_step_flow",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        },
+        {
+          "id": "bitfinex:edge:5",
+          "source": "bitfinex:wallet",
+          "target": "bitfinex:gold",
+          "relation": "converted_to",
+          "description": "Some stolen proceeds were exchanged for gold.",
+          "evidence_status": "guilty_plea_and_sentencing_record",
+          "citations": [
+            {
+              "source_id": "bitfinex-doj",
+              "locator": "Laundering techniques paragraph"
+            }
+          ],
+          "amount": null,
+          "currency": null,
+          "amount_scope": "summarized_multi_step_flow",
+          "amount_qualifier": null,
+          "event_date": null,
+          "date_qualifier": null
+        }
+      ],
+      "metrics": []
+    }
+  ]
+}
