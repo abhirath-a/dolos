@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # dolos - the anti money laundering model
 ## Track: AI + Finance --- Team: Abhi Agasanakoppa and Timothy Vu
 
@@ -25,27 +24,47 @@ Our project was trained with the IBM Transactions for Anti Money Laundering with
 1. [IBM Transactions for Anti Money Laundering (AML)](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml), Created by Erik Altman, Kaggle
 2. [scikit](https://scikit-learn.org/stable/), pandas, NumPy, [Collab](https://colab.research.google.com/), and [Github](https://github.com/)
 3. Ai Tools: 
-=======
 # Dolos — transaction graph and review API
 
 A FastAPI service built from `dolos.ipynb`, with durable batch ingestion, a separate worker, and a directed transaction multigraph. The API runs without the large ML dependencies. The notebook remains available; `dolos/model.py` extracts its feature construction, models, metrics, and training pipeline without running notebook cells at import.
 
+## React frontend
+
+The Evidence Desk app in [`frontend/`](frontend/README.md) opens directly into a genuine GraphSAGE teaching demonstration. The graph has a charcoal canvas, paper evidence inspector, pinned model context, paginated ledger, and source-linked historical cases. Uploads support background batch progress, cancellation and retained successful batches.
+
+```sh
+nix develop
+uv sync --extra test --extra r2 --extra pdf-llm
+uv run uvicorn dolos.api:app --reload
+# Another Nix shell:
+cd frontend
+pnpm install --frozen-lockfile
+pnpm dev
+# Another Nix shell, repository root:
+uv run python -m dolos.worker
+```
+
+Open http://localhost:5173. Build with `pnpm build`, then serve frontend and API together using `uv run uvicorn dolos.web:app` at port 8000. The original `dolos.api:app` API remains available unchanged.
+
+The bundled demo contains actual recorded GraphSAGE/XGBoost outputs on explicitly labeled synthetic teaching data, not IBM data or real bank statements. To regenerate and enable live local inference, install the ML extra and run `uv run python -m dolos.model_demo`. Uploaded canonical transactions use separate configured `DOLOS_MODEL_DIR` artifacts. See the frontend README for provenance, scope, authentication and deployment instructions.
+
+`POST /analyze` accepts a historical `case_id` or uploaded `batch_ids`, visible `edge_ids`, and a model. `/graph` supports inclusive `after` and exclusive `before` date windows. Historical evidence review, partial-PDF pattern checks, and actual trained-model inference remain distinct. Export and the ledger disclose their visible scope.
+
 ## Run locally
 
 ```sh
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e '.[test]'
-python -m dolos.migrate
-uvicorn dolos.api:app --host 127.0.0.1 --port 8000
+nix develop
+uv sync --extra test --extra r2 --extra pdf-llm
+uv run python -m dolos.migrate
+uv run uvicorn dolos.api:app --host 127.0.0.1 --port 8000
 ```
 
-In another terminal, activate the same environment and start a worker:
+In another Nix development shell, start a worker:
 
 ```sh
-dolos-worker
+uv run dolos-worker
 # Process at most one document and exit:
-dolos-worker --once
+uv run dolos-worker --once
 ```
 
 Database and upload storage are configured independently. `DOLOS_DATABASE_URL` defaults to `file:./var/dolos.sqlite3`; `DOLOS_DATA_DIR` defaults to `./data` and holds uploads under `data/uploads`. API and workers must use the same database URL and storage configuration. Local storage requires shared uploaded files; R2 allows separate machines without a shared filesystem. SQLite uses WAL locally; remote libSQL/Turso connections go directly to the primary. Multiple workers can claim work against the same database. Jobs are claimed atomically, have five-minute leases renewed every 30 seconds while processing, and are reclaimed after worker crashes (three attempts maximum). Lease tokens fence stale worker results. Document rows and terminal job status commit together. Parser failures roll back the whole document; row validation failures preserve valid rows and mark the document `needs_review`. Failed documents can be retried explicitly.
@@ -65,7 +84,7 @@ python -m dolos.migrate
 For a **libSQL-backed Turso** database:
 
 ```sh
-pip install -e '.[turso]'
+uv sync --extra turso
 export TURSO_DATABASE_URL='libsql://your-database.turso.io'
 export TURSO_AUTH_TOKEN='your-database-token'
 # Leave DOLOS_DATABASE_URL unset to use TURSO_DATABASE_URL.
@@ -92,13 +111,13 @@ Existing installations can point `DOLOS_DATABASE_URL` at their old database file
 3. Install the extra and export the following variables in your setup terminal. Replace placeholders locally; never put secrets in frontend variables or commit them. `.env.example` documents the settings, but `.env` files are not automatically loaded.
 
 ```bash
-.venv/bin/python -m pip install -e '.[r2]'
+uv sync --extra r2
 export DOLOS_STORAGE_BACKEND=r2
 export R2_ACCOUNT_ID='YOUR_ACCOUNT_ID'
 export R2_BUCKET_NAME='dolos-statements'
 export R2_ACCESS_KEY_ID='YOUR_ACCESS_KEY_ID'
 export R2_SECRET_ACCESS_KEY='YOUR_SECRET_ACCESS_KEY'
-.venv/bin/python -m dolos.storage_setup --origin http://localhost:3000 --origin https://your-app.vercel.app
+uv run python -m dolos.storage_setup --origin http://localhost:3000 --origin https://your-app.vercel.app
 ```
 
 Replace the origins with your actual frontend URLs, without trailing slashes. This replaces the bucket CORS configuration with PUT access for those origins and adds a one-day cleanup rule for `dolos/incoming/` staging objects, preserving other lifecycle rules. It does not enable public access. Alternatively, add `--create-bucket` to create a missing bucket.
@@ -106,14 +125,14 @@ Replace the origins with your actual frontend URLs, without trailing slashes. Th
 4. Create an **Object Read & Write** token scoped to this bucket for runtime use. Put that token's access key and secret, plus `DOLOS_STORAGE_BACKEND`, `R2_ACCOUNT_ID`, and `R2_BUCKET_NAME`, in both the API and worker environments. Use the same database configuration on both. Remove the temporary admin credentials from runtime environments. Check access and apply database migrations:
 
 ```bash
-.venv/bin/python -m dolos.storage_setup --check
-.venv/bin/python -m dolos.migrate
+uv run python -m dolos.storage_setup --check
+uv run python -m dolos.migrate
 ```
 
 5. If you already have local uploads, run the following from the machine that has them, with the original `DOLOS_DATA_DIR` and database configured. It copies files, updates their database locations, and retains local originals:
 
 ```bash
-.venv/bin/python -m dolos.storage_setup --migrate-local
+uv run python -m dolos.storage_setup --migrate-local
 ```
 
 The backfill command also configures the staging lifecycle, so run it with setup/admin credentials before switching to the runtime token. Historical demo graphs have no uploaded files to move.
@@ -153,13 +172,13 @@ Optional `reference` is retained. Amounts are nonnegative, at most 1e18, with up
 Install the extraction dependency and configure the **worker** environment:
 
 ```sh
-pip install -e '.[pdf-llm]'
+uv sync --extra pdf-llm
 export OPENROUTER_API_KEY='your-api-key'
 export DOLOS_PDF_PROVIDER='openrouter'
 export DOLOS_PDF_MODEL='openrouter/free'
 export DOLOS_PDF_MODE='text'  # Default: local text first, vision for scans
 # Restart/start workers with this environment:
-dolos-worker
+uv run dolos-worker
 ```
 
 Upload PDFs through the existing batch endpoint:
@@ -209,8 +228,8 @@ Flexible PDF extraction sends statement text/page images to OpenRouter and its s
 A source-linked dataset includes Al Capone, 1MDB, HSBC, Liberty Reserve, OneCoin, and Bitfinex: 33 entities and 29 relationships. Each edge preserves citations, evidence status, and amount/date qualifiers. These are curated public-history graphs, not fabricated bank statements or training labels. See [the dataset guide and primary sources](examples/famous-cases.md).
 
 ```sh
-.venv/bin/python -m dolos.migrate
-.venv/bin/uvicorn dolos.api:app --host 127.0.0.1 --port 8000
+uv run python -m dolos.migrate
+uv run uvicorn dolos.api:app --host 127.0.0.1 --port 8000
 ```
 
 Read `/demo/cases` for case cards and sourced metrics, `/demo/cases/1mdb` for one complete case, and `/graph` for loaded relationships. Cases are installed by migration 0002 in the main database and retain dataset/case metadata to distinguish them from uploaded statements. The old `dolos-demo` command delegates to migrations; `--list` still lists bundled cases without writing. Loading requires no LLM or worker. Historical edge amounts are excluded from transaction summaries to avoid adding overlapping flows and aggregates.
@@ -220,7 +239,7 @@ Read `/demo/cases` for case cards and sourced metrics, `/demo/cases/1mdb` for on
 No trained weights are included in the repository. Saved notebook benchmark numbers are not a model. Install ML dependencies, obtain the IBM training dataset, and export a fresh artifact directory:
 
 ```sh
-pip install -e '.[ml]'
+uv sync --extra ml
 dolos-train HI-Small_Trans.csv artifacts/run-1 --epochs 6
 export DOLOS_MODEL_DIR="$PWD/artifacts/run-1"
 curl 'http://127.0.0.1:8000/scores?model=graph_xgboost&limit=100'
@@ -245,4 +264,3 @@ The database can run locally or on libSQL/Turso. For multi-host deployment, conf
 Set `DOLOS_API_KEY` to require `Authorization: Bearer <key>` for API routes. Default local mode has no authentication; keep it bound to loopback. Interactive docs remain accessible. Use TLS and appropriate storage permissions before processing sensitive statements on a shared deployment.
 
 Implementation references: [FastAPI file uploads](https://fastapi.tiangolo.com/tutorial/request-files/) and [Python SQLite transactions](https://docs.python.org/3/library/sqlite3.html).
->>>>>>> 95a93b6 (backend: init)

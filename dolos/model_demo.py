@@ -1,0 +1,132 @@
+"""Reproducible, explicitly synthetic teaching demo with actual trained-model outputs.
+
+Run: uv run --extra ml python -m dolos.model_demo
+This is not IBM data, a real investigation, or an accuracy benchmark.
+"""
+import csv
+import hashlib
+import json
+import random
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+
+def generate_csv(path):
+    from .model import IBM_HEADER
+    rng = random.Random(20261115)
+    start = datetime(2025, 1, 6)
+    with path.open('w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(IBM_HEADER)
+        for hour in range(240):
+            # Repeated, labeled routing motifs alternate with ordinary simulated payments.
+            for index in range(12):
+                patterned = index < 4
+                if patterned:
+                    sender, receiver = [(0, 3), (1, 3), (3, 5), (5, 8)][index]
+                    amount = rng.choice([8100, 8400, 8700, 9200])
+                else:
+                    sender = rng.randrange(6, 18)
+                    receiver = rng.randrange(6, 18)
+                    while receiver == sender:
+                        receiver = rng.randrange(6, 18)
+                    amount = rng.randrange(50, 9400)
+                at = start + timedelta(hours=hour, minutes=index * 4)
+                writer.writerow([at.strftime('%Y/%m/%d %H:%M'), 'DEMO', f'{sender:04d}',
+                    'DEMO', f'{receiver:04d}', amount, 'USD', amount, 'USD', 'WIRE', int(patterned)])
+
+
+def build_demo(output=None, epochs=8):
+    from .model import run
+    from .inference import score
+    from .parsers import parse_document
+    from .graph import build_graph
+    root = Path(__file__).parent.parent
+    work = root / 'var' / 'model-demo'
+    work.mkdir(parents=True, exist_ok=True)
+    source = work / 'synthetic-transfers.csv'
+    generate_csv(source)
+    fingerprint = hashlib.sha256(source.read_bytes()).hexdigest()
+    artifacts = work / (fingerprint[:12] + '-e' + str(epochs))
+    if not (artifacts / 'manifest.json').exists():
+        run(source, artifacts, epochs=epochs, batch_size=192)
+    rows = []
+    for index, row, error in parse_document(source, '.csv'):
+        if error:
+            raise ValueError(error)
+        rows.append(dict(row, id=f'simulation:{index}', document_id='synthetic-transfers.csv', source_row=index))
+    predictions = score(rows, artifacts, 'graphsage', 500)
+    # Present the actual highest model margin, including its true sampled history.
+    focus = predictions['scores'][0]['transaction_id']
+    selected_ids = {focus}
+    models = {}
+    for model in ('graphsage', 'graph_xgboost'):
+        prediction = score(rows, artifacts, model, 1, target_ids={focus}, explain=True)
+        prediction['status'] = 'completed'
+        prediction['name'] = model
+        prediction['threshold'] = 0
+        models[model] = prediction
+        for item in prediction['scores']:
+            selected_ids.update((item.get('explanation') or {}).get('context_transaction_ids', []))
+    # Include the source/receiver's recent transfers for a readable local graph.
+    focus_row = next(row for row in rows if row['id'] == focus)
+    neighbors = [row for row in rows if row['timestamp'] <= focus_row['timestamp'] and
+                 (row['sender_id'] in (focus_row['sender_id'], focus_row['receiver_id']) or
+                  row['receiver_id'] in (focus_row['sender_id'], focus_row['receiver_id']))]
+    selected_ids.update(row['id'] for row in neighbors[-18:])
+    display_rows = [row for row in rows if row['id'] in selected_ids]
+    graph = build_graph(display_rows)
+    for node in graph['nodes']:
+        node['label'] = 'Account ' + node['account']
+    manifest = json.loads((artifacts / 'manifest.json').read_text())
+    payload = {
+        'id': 'graphsage-simulation', 'title': 'The pass-through network',
+        'description': 'A simulated transaction network with repeated routing patterns. Inspect a real GraphSAGE prediction and its sampled historical neighborhood.',
+        'data_label': 'Synthetic teaching data', 'execution_label': 'Recorded model run',
+        'notice': 'Generated teaching data and a small demonstration model. These are actual model outputs, not a real investigation or evidence of real-world accuracy.',
+        'generated_at': datetime.now(timezone.utc).isoformat(), 'source_sha256': fingerprint,
+        'generator': 'dolos/model_demo.py', 'source_rows': len(rows), 'epochs': epochs,
+        'run_id': manifest['run_id'], 'artifact_sha256': manifest['artifact_sha256'],
+        'focus_edge_id': focus, 'graph': graph, 'models': models,
+        'provenance': {'kind': 'synthetic', 'license': 'Project-generated teaching fixture',
+                       'training_policy': 'Chronological train/validation/test splits; test predictions occur after model selection. Labels describe generated routing motifs.'}}
+    output = Path(output) if output else root / 'frontend' / 'public' / 'model-demo.json'
+    output.write_text(json.dumps(payload, indent=2) + '\n')
+    (output.parent / 'demo-transfers.csv').write_bytes(source.read_bytes())
+    print(json.dumps({'output': str(output), 'display_edges': len(graph['edges']),
+                      'focus_margin': models['graphsage']['scores'][0]['score'], 'run_id': manifest['run_id']}))
+
+
+def demo_paths():
+    import os
+    root = Path(__file__).parent.parent
+    payload_path = root / 'frontend' / 'public' / 'model-demo.json'
+    if not payload_path.is_file():
+        return None, None, None
+    data = json.loads(payload_path.read_text())
+    directory = Path(os.environ.get('DOLOS_DEMO_MODEL_DIR', str(root / 'var' / 'model-demo' /
+                     (data['source_sha256'][:12] + '-e' + str(data.get('epochs', 8))))))
+    source = root / 'var' / 'model-demo' / 'synthetic-transfers.csv'
+    ready = directory if all((directory / name).is_file() for name in ('manifest.json', 'graphsage.pt', 'graph_xgboost.json')) and source.is_file() else None
+    return data, ready, source
+
+
+def analyze_demo(model):
+    from .inference import score, ModelUnavailable
+    from .parsers import parse_document
+    data, directory, source = demo_paths()
+    if not directory:
+        raise ModelUnavailable('Live demonstration artifacts are not installed. The recorded run remains available.')
+    if hashlib.sha256(source.read_bytes()).hexdigest() != data['source_sha256']:
+        raise ModelUnavailable('Demo source fingerprint differs from the recorded graph. Regenerate the demo.')
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    if manifest.get('run_id') != data['run_id']:
+        raise ModelUnavailable('Demo artifact does not match the displayed graph. Regenerate the demo.')
+    rows = [dict(row, id=f'simulation:{index}', document_id='synthetic-transfers.csv', source_row=index)
+            for index, row, error in parse_document(source, '.csv') if not error]
+    result = score(rows, directory, model, 1, target_ids={data['focus_edge_id']}, explain=True)
+    return dict(result, status='completed', name=model, threshold=0)
+
+
+if __name__ == '__main__':
+    build_demo()

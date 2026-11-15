@@ -27,6 +27,13 @@ bearer = HTTPBearer(auto_error=False)
 log = logging.getLogger(__name__)
 
 
+class AnalysisRequest(BaseModel):
+    batch_ids: List[str] = Field(default_factory=list, max_length=1000)
+    case_id: Optional[str] = None
+    edge_ids: List[str] = Field(default_factory=list, max_length=2000)
+    model: Literal['graph_xgboost', 'transaction_xgboost', 'graphsage'] = 'graph_xgboost'
+
+
 class UploadSpec(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     size: int = Field(gt=0, le=MAX_FILE_BYTES)
@@ -79,8 +86,27 @@ def create_app(data_dir=None):
     def health():
         with store.connect() as db:
             queued = db.execute("SELECT COUNT(*) FROM documents WHERE status IN ('queued','processing')").fetchone()[0]
+        directory = Path(os.environ.get('DOLOS_MODEL_DIR', ''))
+        available = [name for name, suffix in [('graphsage', '.pt'), ('graph_xgboost', '.json')]
+                     if os.environ.get('DOLOS_MODEL_DIR') and (directory / 'manifest.json').is_file()
+                     and (directory / (name + suffix)).is_file()]
         return {'status': 'ok', 'pending_documents': queued,
-                'model_configured': bool(os.environ.get('DOLOS_MODEL_DIR'))}
+                'model_configured': bool(available), 'available_models': available}
+
+    @app.get('/demo/model/status')
+    def model_demo_status():
+        from .model_demo import demo_paths
+        data, directory, source = demo_paths()
+        return {'live_available': bool(directory), 'recorded_available': bool(data),
+                'data_type': 'synthetic_teaching_data'}
+
+    @app.post('/demo/model/analyze')
+    def model_demo_analyze(model: Literal['graphsage', 'graph_xgboost'] = 'graphsage'):
+        from .model_demo import analyze_demo
+        try:
+            return analyze_demo(model)
+        except ModelUnavailable as exc:
+            raise HTTPException(503, str(exc))
 
     @app.get('/demo/cases')
     def demo_cases():
@@ -240,12 +266,21 @@ def create_app(data_dir=None):
             db.execute("UPDATE documents SET status='queued',attempts=0,error=NULL,token=NULL WHERE id=?", (document_id,))
         return {'id': document_id, 'status': 'queued'}
 
-    def select_rows(limit, offset, account, before, batch_id, source='transactions'):
+    def select_rows(limit, offset, account, before, batch_id, source='transactions', after=None):
         if before:
             try:
                 before = timestamp(before)
             except ValueError:
                 raise HTTPException(422, 'before must be an ISO 8601 timestamp')
+        if after:
+            try:
+                after = timestamp(after)
+            except ValueError:
+                raise HTTPException(422, 'after must be an ISO 8601 timestamp')
+        if after and before and after >= before:
+            raise HTTPException(422, 'after must precede before')
+        if source == 'graph_rows':
+            return store.graph_rows(limit, offset, account, before, batch_id, after)
         return getattr(store, source)(limit, offset, account, before, batch_id)
 
     @app.get('/transactions')
@@ -264,11 +299,90 @@ def create_app(data_dir=None):
 
     @app.get('/graph')
     def graph(limit: int = Query(1000, ge=1, le=10000), offset: int = Query(0, ge=0),
-              account: Optional[str] = None, before: Optional[str] = None, batch_id: Optional[str] = None):
-        rows = select_rows(limit + 1, offset, account, before, batch_id, source='graph_rows')
+              account: Optional[str] = None, before: Optional[str] = None, batch_id: Optional[str] = None, after: Optional[str] = None):
+        rows = select_rows(limit + 1, offset, account, before, batch_id, source='graph_rows', after=after)
         return dict(build_graph(rows[:limit]), has_more=len(rows) > limit,
                     next_offset=offset + limit if len(rows) > limit else None,
-                    scope='Summaries cover only the returned page; before is exclusive.')
+                    scope='Summaries cover only the returned page; after is inclusive and before is exclusive.')
+
+    @app.post('/analyze')
+    def analyze(request: AnalysisRequest):
+        from .analysis import analyze_graph
+        historical = bool(request.case_id)
+        if historical and request.batch_ids:
+            raise HTTPException(422, 'Select either a historical case or uploaded batches.')
+        if historical:
+            from .demo import load_dataset, case_rows
+            dataset = load_dataset()
+            case = next((c for c in dataset['cases'] if c['id'] == request.case_id), None)
+            if case is None:
+                raise HTTPException(404, 'Case not found')
+            rows = [dict(row, id=case['edges'][i]['id'], document_id=None, source_row=i+1)
+                    for i, row in enumerate(case_rows(dataset, case))]
+        else:
+            if not request.batch_ids:
+                raise HTTPException(422, 'Select at least one uploaded batch.')
+            rows = []
+            for batch_id in request.batch_ids:
+                if store.batch(batch_id) is None:
+                    raise HTTPException(404, 'Batch not found')
+                if request.edge_ids:
+                    # Read only requested edges belonging to the selected batches.
+                    import json
+                    placeholders = ','.join('?' for _ in request.edge_ids)
+                    with store.connect() as db:
+                        selected = db.execute("""SELECT * FROM
+                            (SELECT * FROM transactions UNION ALL SELECT * FROM relations)
+                            WHERE document_id IN (SELECT document_id FROM batch_documents WHERE batch_id=?)
+                            AND id IN (""" + placeholders + ')', [batch_id] + request.edge_ids).fetchall()
+                    rows.extend(dict(json.loads(r['payload']), id=r['id'], document_id=r['document_id'],
+                                     source_row=r['source_row']) for r in selected)
+                else:
+                    rows.extend(store.graph_rows(2001, 0, None, None, batch_id))
+            rows = list({row['id']: row for row in rows}.values())
+            if len(rows) > 2000:
+                raise HTTPException(413, 'Analysis supports 2,000 visible relationships at once. Send edge_ids to analyze a graph slice.')
+        rows.sort(key=lambda row: (row.get('timestamp') or '', row['id']))
+        graph = build_graph(rows)
+        result = analyze_graph(graph, historical)
+        result['model'] = {'status': 'not_applicable', 'name': request.model,
+                           'reason': 'Historical relationships are source-linked case evidence, not model input.'}
+        candidates = {row['id'] for row in rows if row.get('record_type') != 'relation'}
+        if candidates:
+            history = store.transactions(MAX_HISTORY + 1)
+            if len(history) > MAX_HISTORY:
+                raise HTTPException(413, 'Model history exceeds 100,000 rows; offline scoring required.')
+            try:
+                prediction = score(history, os.environ.get('DOLOS_MODEL_DIR'), request.model, 2000,
+                                   target_ids=candidates, explain=True)
+                result['model'] = dict(prediction, status='completed', name=request.model,
+                    threshold=0, decision_policy='Raw margin above zero is the classifier positive decision; not a calibrated probability.')
+                existing = {item['edge_id']: item for item in result['findings']}
+                edge_map = {edge['id']: edge for edge in graph['edges']}
+                for item in prediction['scores']:
+                    if item['score'] <= 0:
+                        continue
+                    edge = edge_map[item['transaction_id']]
+                    finding = existing.get(edge['id'])
+                    if finding is None:
+                        finding = {'edge_id': edge['id'], 'source': edge['source'], 'target': edge['target'], 'reasons': []}
+                        result['findings'].append(finding)
+                    finding['reasons'].append({'rule': 'Model positive decision', 'detail':
+                        'Raw margin %.4f exceeds the classifier boundary of zero.' % item['score']})
+                counts = {}
+                for finding in result['findings']:
+                    for node in {finding['source'], finding['target']}:
+                        counts[node] = counts.get(node, 0) + 1
+                result['entities'] = [{'id': key, 'flagged_connections': value} for key, value in
+                    sorted(counts.items(), key=lambda item: -item[1])]
+            except ModelUnavailable as exc:
+                result['model'] = {'status': 'unavailable', 'name': request.model, 'reason': str(exc)}
+        elif not historical:
+            result['model']['reason'] = 'Extracted relationships lack complete canonical model fields. Pattern checks ran instead.'
+        result['summary'] = ('%s relationships highlighted for review.' % len(result['findings']) if result['findings'] else
+                             'No configured rules or available predictions flagged these relationships.')
+        result['scope'] = {'relationships': len(rows), 'historical': historical, 'model_eligible': len(candidates)}
+        return result
 
     @app.get('/scores')
     def scores(limit: int = Query(100, ge=1, le=1000),

@@ -64,11 +64,11 @@ class Store:
     def relations(self, limit=1000, offset=0, account=None, before=None, batch_id=None):
         return self._rows('relations', limit, offset, account, before, batch_id)
 
-    def graph_rows(self, limit=1000, offset=0, account=None, before=None, batch_id=None):
+    def graph_rows(self, limit=1000, offset=0, account=None, before=None, batch_id=None, after=None):
         return self._rows('(SELECT * FROM transactions UNION ALL SELECT * FROM relations)',
-                          limit, offset, account, before, batch_id)
+                          limit, offset, account, before, batch_id, after)
 
-    def _rows(self, source, limit, offset, account, before, batch_id):
+    def _rows(self, source, limit, offset, account, before, batch_id, after=None):
         clauses, args = [], []
         if account:
             clauses.append('(sender_id=? OR receiver_id=?)')
@@ -76,6 +76,9 @@ class Store:
         if before:
             clauses.append('timestamp<?')
             args.append(before)
+        if after:
+            clauses.append('timestamp>=?')
+            args.append(after)
         if batch_id:
             clauses.append('document_id IN (SELECT document_id FROM batch_documents WHERE batch_id=?)')
             args.append(batch_id)

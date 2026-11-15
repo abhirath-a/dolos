@@ -34,6 +34,27 @@ def test_training_export_and_serving_use_identical_features(tmp_path):
         by_id = {r['transaction_id']: r['score'] for r in actual['scores']}
         ordered = [by_id[r['id']] for r in rows[-len(expected):]]
         np.testing.assert_allclose(ordered, expected, atol=1e-5, rtol=1e-5)
+        explained = score(rows, artifacts, name, 1000, target_ids=set(by_id), explain=True)
+        if 'xgboost' in name:
+            for result in explained['scores']:
+                detail = result['explanation']
+                if detail is None:
+                    continue
+                assert detail['kind'] == 'tree_shap'
+                assert all(not f['name'].startswith('Feature ') for f in detail['features'])
+                assert abs(detail['base_margin'] + detail['contribution_sum'] - result['score']) < 1e-4
+                assert detail['tree_paths'] and detail['tree_count'] == 150
+        elif name == 'graphsage':
+            by_row = {row['id']: row for row in rows}
+            for result in explained['scores']:
+                detail = result['explanation']
+                if detail is None:
+                    continue
+                assert detail['kind'] == 'graph_context'
+                for transaction_id in detail['context_transaction_ids']:
+                    from datetime import timezone
+                    at = datetime.fromisoformat(by_row[transaction_id]['timestamp'])
+                    assert at.timestamp() * 1_000_000 < result['context_cutoff_us']
         # Same-hour and future transfers must not influence earlier scores.
         future = dict(rows[-1], id='future', timestamp='2023-01-01T00:00:00.000000+00:00', amount_paid='999999')
         changed = score(rows + [future], artifacts, name, 1000)

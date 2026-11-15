@@ -12,3 +12,9 @@ HI-Small_Trans.csv
 
 data-demo/
 var/
+
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+.direnv/
+.impeccable/
