@@ -31,3 +31,6 @@ testpaths = ["tests"]
 
 [tool.setuptools.package-data]
 dolos = ["migrations/*.sql", "migrations/*.json"]
+
+[tool.vercel]
+entrypoint = "dolos.api:app"
