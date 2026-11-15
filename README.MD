@@ -10,7 +10,7 @@ While authorities are trying there best to stop this crime, and are being pretty
 Dolos uses a list of bank transactions and returns either "Looks like laundering" or "Looks normal".
 
 ## What We Added
-Our project was trained with the IBM Transactions for Anti Money Laundering. When we were looking through the dataset we realized that there was a 
+Our project was trained with the IBM Transactions for Anti Money Laundering with the LI-Small_Trans.csv file. When we were looking through the dataset we realized that there was a large amount of transactions under the payment format of reinvestment.
 
 ## How It Works
 
