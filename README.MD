@@ -10,7 +10,7 @@ While authorities are trying there best to stop this crime, and are being pretty
 Dolos uses a list of bank transactions and returns either "Looks like laundering" or "Looks normal".
 
 ## What We Added
-Our project was trained with the IBM Transactions for Anti Money Laundering. When we were looking through the dataset
+Our project was trained with the IBM Transactions for Anti Money Laundering. When we were looking through the dataset we realized that there was a 
 
 ## How It Works
 
@@ -20,4 +20,5 @@ Our project was trained with the IBM Transactions for Anti Money Laundering. Whe
 
 ### Sources
 1. [IBM Transactions for Anti Money Laundering (AML)](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml), Created by Erik Altman, Kaggle
-2. [scikit](https://scikit-learn.org/stable/), pandas, NumPy, and [Collab](https://colab.research.google.com/)
+2. [scikit](https://scikit-learn.org/stable/), pandas, NumPy, [Collab](https://colab.research.google.com/), and [Github](https://github.com/)
+3. Ai Tools: 
