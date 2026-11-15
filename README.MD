@@ -19,4 +19,4 @@ Our project was trained with the IBM Transactions for Anti Money Laundering. Whe
 ## What We Would Do Next
 
 ### Sources
-1. (IBM Transactions for Anti Money Laundering (AML)) [https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml], Created by Erik Altman, Kaggle
+1. [IBM Transactions for Anti Money Laundering (AML)](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml), Created by Erik Altman, Kaggle
