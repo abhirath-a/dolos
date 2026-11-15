@@ -28,6 +28,8 @@ Our project was trained with the IBM Transactions for Anti Money Laundering with
 
 A FastAPI service built from `dolos.ipynb`, with durable batch ingestion, a separate worker, and a directed transaction multigraph. The API runs without the large ML dependencies. The notebook remains available; `dolos/model.py` extracts its feature construction, models, metrics, and training pipeline without running notebook cells at import.
 
+Turso (`libsql`) and R2 (`boto3`) drivers are base runtime dependencies so Vercel's default Python installation includes them. The `turso` and `r2` extras remain compatible with existing commands. If a previous deployment reports `No module named 'libsql'`, deploy the updated `pyproject.toml` and `uv.lock` together and rebuild without the previous build cache. PDF extraction and ML dependencies remain optional.
+
 ## React frontend
 
 The Evidence Desk app in [`frontend/`](frontend/README.md) opens directly into a genuine GraphSAGE teaching demonstration. The graph has a charcoal canvas, paper evidence inspector, pinned model context, paginated ledger, and source-linked historical cases. Uploads support background batch progress, cancellation and retained successful batches.
