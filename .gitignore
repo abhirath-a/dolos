@@ -23,3 +23,12 @@ frontend/dist/
 output/
 
 .DS_Store
+
+video/node_modules/
+video/out/
+video/build/
+video/public/footage/
+video/public/fonts/
+video/src/media.generated.json
+media/*
+!media/README.md

@@ -1,79 +1,52 @@
 # Dolos
 
-**Veritas AI Hackathon · Finance**
+**Track:** AI + Finance
 
-**Team:** Abhi Agasanakoppa and Timothy Vu
+**Team:** Abhirath Agasanakoppa and Timothy Vu
 
-Dolos turns financial statements into a directed transaction graph, ranks transfers for review, and shows the evidence behind each model decision.
+[Live demo](https://dolos-web.vercel.app) · [Source code](https://github.com/abhirath-a/dolos) · [Evaluation notebook](dolos.ipynb) · [Sample statements](https://drive.google.com/drive/folders/1_wOnd3X4I4Ws3uKO-V3OOrPi05OkOCEL?usp=drive_link) · [Video](https://youtu.be/HR9kh6V0AYs)
 
-[Try the demo](https://dolos-web.vercel.app) · [Source](https://github.com/abhirath-a/dolos) · [Notebook](dolos.ipynb) · [Mock statement pack](frontend/public/dolos-video-statements.zip) · [Technical guide](docs/technical-guide.md)
-
-**Prototype only. Not financial advice, proof of money laundering, or a determination of criminal responsibility.**
+**Dolos is a prototype for human review. Its scores do not constitute financial advice or evidence of wrongdoing.**
 
 ## The problem
 
-A spreadsheet shows individual payments. It is harder to see how money moves between connected accounts, which transfers deserve attention, and why a model flagged them. We built Dolos to bring those questions into one explorable graph.
+When a small business's finance analyst reviews a set of statements for unusual transfers, a ledger shows each payment on its own. The analyst has to piece together which accounts repeatedly pass money to one another and decide which transfers to review first.
 
-## Try it as a judge
+## What we built
 
-Choose an example, click **Analyze network**, and inspect a scored transfer. Dolos runs one pipeline: **GraphSAGE encodes the neighborhood → XGBoost makes the final decision**. Each score credits the graph-derived features and direct transaction fields. The highest-ranked results also include actual sampled neighbors and decision-tree branches.
+Dolos takes PDF, CSV, or JSON statements and turns them into a directed graph of accounts and transfers. It ranks eligible transfers for review and lets the analyst inspect the account history the model used, see what raised or lowered the score, and return to the source record.
 
-| Live example | What to explore |
-| --- | --- |
-| The pass-through network | A transfer within a repeated routing pattern |
-| Two senders, one collector | Incoming transfers converging on one account |
-| Ordinary payment comparison | Eight generated payments used as a negative comparison |
-| Routing and ordinary payments | Twelve transfers containing both kinds of generated activity |
+In the [live demo](https://dolos-web.vercel.app), choose **The pass-through network**, click **Analyze network**, and select the flagged transfer. To try ingestion, upload the four [sample PDFs](frontend/public/dolos-video-statements.zip) together. Their embedded CSV exports supply 1,200 synthetic transfers without an extraction API call.
 
-Every click sends a new inference request. The server recalculates from transaction history and trained weights; it does not substitute recorded scores. Repeated runs on identical inputs should agree.
+## What we added
 
-To test uploads, download the mock pack and upload its four PDFs together. They contain 1,200 synthetic transactions. Each PDF visibly discloses its embedded CSV export, which makes this test reproducible without an LLM call. Ordinary PDFs without that export use the configured extraction provider. [Video walkthrough and expected results](docs/video-demo.md)
+Our own idea. We asked whether an account's incoming and outgoing payment history would improve transfer ranking. We built the graph view so a reviewer could inspect that history and the evidence behind a score in the same workflow.
 
 ## How it works
 
-1. **Ingest:** upload PDF, CSV or JSON statements. A durable database queue lets a separate worker process batches.
-2. **Connect:** accounts become nodes; transfers become directed edges. Records retain source-document and row/page provenance where available.
-3. **Score:** directed GraphSAGE produces 128 sender/receiver embedding values from history before the target hour. One XGBoost classifier consumes those embeddings and eight direct transaction features to make the final decision. The neural encoder is frozen; the final classifier is trained offline on the chronological training partition.
-4. **Explain:** grouped TreeSHAP credits GraphSAGE-derived features and direct transaction fields for each score; those credits plus the baseline add to the final margin. GraphSAGE supplies neighborhood representations; XGBoost supplies the final decision and attributions. Neither feature credit nor context membership proves causation, and margins are not confidence percentages.
+We generated 2,880 labeled transfers with simulated routing patterns and ordinary payments. We validated the CSV rows, sorted them by time, and learned category codes on the training set. The chronological split used 2,016 training, 432 validation, and 432 test transfers. Each prediction uses graph history from before the target hour.
 
-We expanded the notebook into an application with a stacked GraphSAGE-to-XGBoost model, batch ingestion, flexible PDF extraction, durable jobs, an interactive graph, explanations, and lightweight inference for deployment. React/TanStack Query power the frontend; FastAPI serves the API on Vercel; Railway runs the worker; Turso stores records/jobs; Cloudflare R2 stores documents.
+The baseline is XGBoost with transaction fields such as amount, currency, and payment format. The final model adds GraphSAGE embeddings that summarize both accounts' earlier incoming and outgoing transfers. We froze the encoder after validation and trained one XGBoost classifier on the combined features. TreeSHAP shows how the graph and transaction feature groups contributed to the final score.
 
-## Results and model provenance
+## Results
 
-The notebook now compares **one baseline and the final hybrid** on the same 432 test transfers. The executed default run uses 2,880 generated source transfers:
+Both models scored the same 432 held-out synthetic transfers, including 144 labeled routing transfers.
 
 | Model | Average precision | Precision at 100 |
 | --- | ---: | ---: |
-| Baseline: transaction-only XGBoost | 0.976999 | 0.980 |
-| Final: GraphSAGE → XGBoost | 1.000000 | 1.000 |
+| Transaction-only XGBoost baseline | 0.976999 | 0.980 |
+| GraphSAGE → XGBoost | 1.000000 | 1.000 |
 
-These are synthetic-data results, not IBM results or whole-dataset accuracy. The notebook uses 2,016 training rows, 432 validation rows and 432 test rows. Test labels do not select weights or checkpoints. The simple generator does not establish real-world accuracy. The optional IBM data mode needs a separate run.
+The baseline flagged an ordinary **$9,243 wire** from account `0016` to `0007`. Its amount and payment format resembled generated routing transfers, which may explain the false alert. The hybrid correctly left it unflagged and made no classification errors on this split. Because the training and test data came from the same generator, the scores tell us how well the model recognizes these simulated patterns. The live demo also uses weights trained on synthetic data. On regular PDFs, missing fields such as payment format can prevent model scoring. Dolos labels any fallback pattern checks separately.
 
-**The website uses a new stacked hybrid trained on our generated teaching data, not the IBM-trained notebook weights.** Its frozen GraphSAGE encoder feeds a separately fitted XGBoost decision head. The hybrid flags four routing transfers and leaves eight ordinary transfers below the boundary in the mock pack's final-hour window. This checks the demo pipeline, not real-world effectiveness. [Reproducible validation](output/pdf/validation.json)
+## What we'd do next
 
-GraphSAGE's deployment runtime evaluates its trained tensors with NumPy. It matched the original PyTorch implementation within 0.000003 on the tested held-out demo rows, with identical decisions. XGBoost uses its native CPU runtime.
+- Run the same comparison on IBM AMLworld and measure false alerts and missed transfers on its held-out data.
+- Test extraction on more statement layouts and measure how often missing or incorrect fields prevent reliable scoring.
 
-## Limitations and next steps
+## Sources
 
-The teaching data is deliberately simple. It is not an independent external evaluation. Missing fields in ordinary PDF extractions can prevent trained-model scoring; those records use separately labeled pattern checks. Extraction can make mistakes, and named entities or highlighted transfers require human review.
-
-Next steps are to deploy and evaluate the IBM-trained artifacts, test more statement layouts and datasets, measure false positives, and add access controls and retention policies before handling real statements. Use public or synthetic documents in this demo; the configured free extraction endpoint may log submitted data.
-
-## Credits
-
-- **Data:** [IBM AMLworld / Erik Altman](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml) is the optional external notebook source. The executed default notebook, website and mock statements use [our fixture generator](dolos/model_demo.py); no real bank records are included.
-- **Models:** [GraphSAGE / PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.SAGEConv.html), [PyTorch](https://pytorch.org/), [XGBoost](https://xgboost.readthedocs.io/), and [scikit-learn](https://scikit-learn.org/). The demo AML weights are trained on our synthetic data, not externally pretrained AML weights.
-- **PDF extraction:** [NVIDIA Nemotron 3.5 Super VL (free), through OpenRouter](https://openrouter.ai/nvidia/nemotron-3.5-super-vl:free). The configured/resolved extraction model is recorded with extracted relations; this model extracts transactions rather than deciding laundering risk.
-- **AI assistance:** [OpenAI Codex](https://openai.com/codex/) and [ChatGPT](https://chatgpt.com/) assisted implementation, debugging, tests and documentation. [Impeccable](https://impeccable.style/) supplied interface-design guidance.
-- **Application:** [React](https://react.dev/), [TanStack Query](https://tanstack.com/query), [React Flow](https://reactflow.dev/), [Dagre](https://github.com/dagrejs/dagre), [FastAPI](https://fastapi.tiangolo.com/), [NumPy](https://numpy.org/), [Polars](https://pola.rs/), [pypdf](https://pypdf.readthedocs.io/), and [ReportLab](https://www.reportlab.com/).
-
-## Run locally
-
-```sh
-nix develop
-uv sync --extra test --extra pdf-llm
-pnpm --dir frontend install --frozen-lockfile
-uv run uvicorn dolos.api:app --reload
-```
-
-In separate Nix shells, run `pnpm --dir frontend dev` and `uv run --extra pdf-llm dolos-worker`. Open `http://localhost:5173`. Built-in examples need no provider key; ordinary PDF extraction does. See the [technical guide](docs/technical-guide.md) for configuration and the [submission checklist](docs/submission-checklist.md) for the remaining form/video steps.
+- **Data:** [Our synthetic data generator](dolos/model_demo.py) and [IBM AMLworld](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml), an optional notebook dataset.
+- **Models and evaluation:** [GraphSAGE](https://arxiv.org/abs/1706.02216), [PyTorch](https://pytorch.org/), [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/), [XGBoost](https://xgboost.readthedocs.io/), [scikit-learn](https://scikit-learn.org/), [NumPy](https://numpy.org/), and [Polars](https://pola.rs/).
+- **AI tools:** We used [OpenAI Codex](https://openai.com/codex/) a little for UI design, with guidance from [Impeccable](https://impeccable.style/). Codex and [ChatGPT](https://chatgpt.com/) also assisted with implementation, debugging, tests, and documentation. [NVIDIA Nemotron via OpenRouter](https://openrouter.ai/nvidia/nemotron-3.5-super-vl:free) extracts transaction fields from PDFs that lack an embedded export.
+- **App and documents:** [React](https://react.dev/), [TanStack Query](https://tanstack.com/query), [React Flow](https://reactflow.dev/), [Dagre](https://github.com/dagrejs/dagre), [FastAPI](https://fastapi.tiangolo.com/), [pypdf](https://pypdf.readthedocs.io/), and [ReportLab](https://www.reportlab.com/).
