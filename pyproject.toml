@@ -30,7 +30,7 @@ include = ["dolos*"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-dolos = ["migrations/*.sql", "migrations/*.json"]
+dolos = ["migrations/*.sql", "migrations/*.json", "demo_assets/*.json", "demo_assets/*.csv", "demo_assets/artifacts/*"]
 
 [tool.vercel]
 entrypoint = "dolos.api:app"

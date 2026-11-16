@@ -38,3 +38,26 @@ def test_demo_live_status_is_explicit_when_artifacts_missing(tmp_path,monkeypatc
     assert client.get('/demo/model/status').json()['live_available'] is False
     assert client.post('/demo/model/analyze?model=graphsage').status_code==503
     assert client.post('/demo/model/analyze?model=bad').status_code==422
+
+
+def test_packaged_demo_matches_frontend_and_live_predictions(tmp_path, monkeypatch):
+    import pytest
+    pytest.importorskip('torch')
+    pytest.importorskip('xgboost')
+    monkeypatch.delenv('DOLOS_DEMO_MODEL_DIR', raising=False)
+    monkeypatch.delenv('DOLOS_DEMO_SOURCE_CSV', raising=False)
+    monkeypatch.delenv('DOLOS_API_KEY', raising=False)
+    from dolos.model_demo import demo_paths
+    data, directory, source = demo_paths()
+    assert directory.is_relative_to(ROOT / 'dolos/demo_assets')
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == data['source_sha256']
+    assert data == json.loads((ROOT / 'frontend/public/model-demo.json').read_text())
+    client = TestClient(create_app(tmp_path / 'uploads'))
+    assert client.get('/demo/model/status').json()['live_available']
+    for name in ('graphsage', 'graph_xgboost'):
+        response = client.post('/demo/model/analyze', params={'model': name})
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result['name'] == name
+        assert result['scores'][0]['score'] == pytest.approx(data['models'][name]['scores'][0]['score'], abs=1e-4)
+        assert result['scores'][0]['explanation']

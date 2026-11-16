@@ -105,9 +105,12 @@ def create_app(data_dir=None):
 
     @app.get('/demo/model/status')
     def model_demo_status():
+        from importlib.util import find_spec
         from .model_demo import demo_paths
         data, directory, source = demo_paths()
-        return {'live_available': bool(directory), 'recorded_available': bool(data),
+        missing = [name for name in ('numpy', 'polars', 'torch', 'torch_geometric', 'sklearn', 'xgboost') if find_spec(name) is None]
+        return {'live_available': bool(directory) and not missing, 'recorded_available': bool(data),
+                'reason': 'Install dolos[ml]; missing: ' + ', '.join(missing) if missing else None,
                 'data_type': 'synthetic_teaching_data'}
 
     @app.post('/demo/model/analyze')

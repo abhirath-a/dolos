@@ -215,7 +215,16 @@ export default function UploadPanel({
         </section>
         <div className="upload-help">
           <p className="provider-note">
-            PDFs use your configured extraction provider.
+            Ordinary PDFs use your configured extraction provider. PDFs with an
+            embedded transaction export use that export instead.
+          </p>
+          <p className="provider-note">
+            <a href="/dolos-video-statements.zip" download>
+              Download synthetic video statements
+            </a>{" "}
+            — four PDFs with 1,200 transactions. Upload the PDFs or their CSV
+            companions, not both. These test model behavior, not real-world
+            accuracy.
           </p>
           <details>
             <summary>What happens to my documents?</summary>

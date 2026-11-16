@@ -5,6 +5,8 @@ __pycache__/
 data/
 flowgraph_notebook_run/
 artifacts/
+!dolos/demo_assets/artifacts/
+!dolos/demo_assets/artifacts/**
 HI-Small_Trans.csv
 .env
 .env.*
@@ -18,3 +20,4 @@ frontend/dist/
 *.tsbuildinfo
 .direnv/
 .impeccable/
+output/

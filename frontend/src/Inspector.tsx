@@ -636,6 +636,16 @@ export default function Inspector({
                     <dd>{human(edge.amount_scope)}</dd>
                   </div>
                 )}
+                {edge.evidence?.attachment && (
+                  <div>
+                    <dt>Extraction source</dt>
+                    <dd>
+                      {edge.evidence.attachment} · row {edge.evidence.row}
+                      <br />
+                      {edge.evidence.note}
+                    </dd>
+                  </div>
+                )}
                 {edge.amount_qualifier && (
                   <div>
                     <dt>Qualifier</dt>

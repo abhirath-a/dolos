@@ -40,7 +40,14 @@ export interface Edge {
   citations?: Citation[];
   document_id?: string;
   source_row?: number;
-  evidence?: { page?: number; quote?: string; citations?: Citation[] };
+  evidence?: {
+    page?: number;
+    quote?: string;
+    citations?: Citation[];
+    attachment?: string;
+    row?: number;
+    note?: string;
+  };
   review_reasons?: string[];
 }
 export interface Graph {

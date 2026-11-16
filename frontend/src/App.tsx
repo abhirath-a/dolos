@@ -77,10 +77,12 @@ async function loadAsset<T>(path: string): Promise<T> {
 }
 export default function App() {
   const [selection, setSelection] = useState(() => {
-    const saved = stored<unknown>("dolos:selection", "case:1mdb");
-    return typeof saved === "string" && saved.length < 150
+    const saved = stored<unknown>("dolos:selection", "demo");
+    return typeof saved === "string" &&
+      saved.length < 150 &&
+      (saved === "demo" || saved.startsWith("investigation:"))
       ? saved
-      : "case:1mdb";
+      : "demo";
   });
   const [view, setView] = useState<"workspace" | "upload" | "about">(
     "workspace",
@@ -274,20 +276,16 @@ export default function App() {
       key: string;
       selection: string;
       model: ModelName;
-      execution: "live" | "recorded";
       batchIds: string[];
       edgeIds: string[];
     }) => {
       if (input.selection === "demo") {
         if (!demoQuery.data)
           throw new Error("The teaching fixture has not loaded. Try again.");
-        const response =
-          input.execution === "live"
-            ? await api<Analysis["model"]>(
-                `/demo/model/analyze?model=${input.model}`,
-                { method: "POST" },
-              )
-            : demoQuery.data.models[input.model];
+        const response = await api<Analysis["model"]>(
+          `/demo/model/analyze?model=${input.model}`,
+          { method: "POST" },
+        );
         return demoAnalysis(demoQuery.data, response);
       }
       return jsonPost<Analysis>(
@@ -307,11 +305,7 @@ export default function App() {
         key: input.key,
         analysis: response,
         execution:
-          input.selection === "demo"
-            ? input.execution === "live"
-              ? "Live model run"
-              : "Recorded model run"
-            : "Live analysis",
+          input.selection === "demo" ? "Live model run" : "Live analysis",
       });
       const first =
         response.model.scores?.find((s) => s.explanation)?.transaction_id ||
@@ -329,13 +323,11 @@ export default function App() {
     analyze.isError && analyze.variables?.key === analysisKey
       ? analyze.error.message
       : "";
-  function run(recorded = false) {
+  function run() {
     analyze.mutate({
       key: analysisKey,
       selection,
       model,
-      execution:
-        mode === "demo" && (!liveDemo || recorded) ? "recorded" : "live",
       batchIds,
       edgeIds: baseGraph.edges.map((e) => e.id),
     });
@@ -412,9 +404,7 @@ export default function App() {
       ? "Review source evidence"
       : mode === "uploaded" && !trainedAvailable
         ? "Run pattern checks"
-        : mode === "demo" && !liveDemo
-          ? "View recorded run"
-          : `Run ${modelNames[model]}`;
+        : `Run ${modelNames[model]}`;
   const loadingGraph =
     mode === "demo"
       ? demoQuery.isPending
@@ -518,18 +508,9 @@ export default function App() {
             value={selection}
             onChange={(e) => choose(e.target.value)}
           >
-            <optgroup label="Model demonstration">
-              <option value="demo">GraphSAGE demo</option>
+            <optgroup label="Live model example">
+              <option value="demo">Pass-through network</option>
             </optgroup>
-            {!!datasetQuery.data?.cases.length && (
-              <optgroup label="Historical cases">
-                {datasetQuery.data.cases.map((c) => (
-                  <option key={c.id} value={`case:${c.id}`}>
-                    {c.title.split(":")[0]} — {c.period}
-                  </option>
-                ))}
-              </optgroup>
-            )}
             {!!investigations.length && (
               <optgroup label="Your investigations">
                 {investigations.map((i) => (
@@ -612,10 +593,9 @@ export default function App() {
                 <div>
                   <h2>Evidence stays attached.</h2>
                   <p>
-                    Historical examples use public citations. Uploaded records
-                    keep source rows and available page evidence. Partial PDF
-                    relationships use labeled pattern checks when canonical
-                    model fields are missing.
+                    Uploaded records keep source rows and available page
+                    evidence. Partial PDF relationships use labeled pattern
+                    checks when canonical model fields are missing.
                   </p>
                 </div>
               </section>
@@ -623,10 +603,10 @@ export default function App() {
                 <Info size={19} />
                 <p>
                   The bundled graph model demonstration uses generated teaching
-                  data and actual recorded model outputs. It is not a real
-                  investigation or a real-world accuracy benchmark. When local
-                  artifacts are installed, the same example also supports live
-                  inference.
+                  data and recalculates model predictions on each run. It is not
+                  a real investigation or a real-world accuracy benchmark.
+                  Compatible model artifacts and ML dependencies must be
+                  installed on the API.
                 </p>
               </div>
               <button className="button primary" onClick={() => choose("demo")}>
@@ -779,7 +759,7 @@ export default function App() {
                       : mode === "demo"
                         ? liveDemo
                           ? "Live inference available"
-                          : "Recorded model run"
+                          : "Live inference not ready"
                         : trainedAvailable
                           ? "Live inference available"
                           : "Pattern analysis available"}
@@ -836,11 +816,6 @@ export default function App() {
                   >
                     Retry
                   </button>
-                  {mode === "demo" && analysisError && (
-                    <button className="text-button" onClick={() => run(true)}>
-                      View recorded run instead
-                    </button>
-                  )}
                 </div>
               )}
               {mode === "uploaded" && docs.length > 0 && (

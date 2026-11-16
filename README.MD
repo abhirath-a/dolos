@@ -32,7 +32,7 @@ Turso (`libsql`) and R2 (`boto3`) drivers are base runtime dependencies so Verce
 
 ## React frontend
 
-The Evidence Desk app in [`frontend/`](frontend/README.md) opens directly into a genuine GraphSAGE teaching demonstration. The graph has a charcoal canvas, paper evidence inspector, pinned model context, paginated ledger, and source-linked historical cases. Uploads support background batch progress, cancellation and retained successful batches.
+The Evidence Desk app in `frontend/` opens directly into a genuine GraphSAGE teaching demonstration. The graph has a charcoal canvas, paper evidence inspector, pinned model context, and paginated ledger. Historical reconstructions remain archived in the API/data, but are excluded from the model example picker because they lack canonical transaction fields. Uploads support background batch progress, cancellation and retained successful batches.
 
 ```sh
 nix develop
@@ -48,7 +48,7 @@ uv run python -m dolos.worker
 
 Open http://localhost:5173. Build with `pnpm build`, then serve frontend and API together using `uv run uvicorn dolos.web:app` at port 8000. The original `dolos.api:app` API remains available unchanged.
 
-The bundled demo contains actual recorded GraphSAGE/XGBoost outputs on explicitly labeled synthetic teaching data, not IBM data or real bank statements. To regenerate and enable live local inference, install the ML extra and run `uv run python -m dolos.model_demo`. Uploaded canonical transactions use separate configured `DOLOS_MODEL_DIR` artifacts. See the frontend README for provenance, scope, authentication and deployment instructions.
+The bundled demo uses explicitly labeled synthetic teaching data, not IBM data or real bank statements. Analyze always recomputes GraphSAGE or Graph XGBoost on the server; recorded predictions are never substituted on failure. Matching source data, manifests and trained weights are shipped under `dolos/demo_assets/`. Install the ML extra for live inference. To regenerate the source, frontend fixture and packaged weights together, run `uv run --extra ml python -m dolos.model_demo`. Uploaded canonical transactions use separate configured `DOLOS_MODEL_DIR` artifacts. For the generated synthetic upload pack only, point it to `dolos/demo_assets/artifacts`; this teaching model does not establish real-world accuracy. See [the video runbook](docs/video-demo.md).
 
 `POST /analyze` accepts a historical `case_id` or uploaded `batch_ids`, visible `edge_ids`, and a model. `/graph` supports inclusive `after` and exclusive `before` date windows. Historical evidence review, partial-PDF pattern checks, and actual trained-model inference remain distinct. Export and the ledger disclose their visible scope.
 

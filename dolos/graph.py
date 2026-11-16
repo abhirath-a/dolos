@@ -50,6 +50,9 @@ def _build_graph(rows):
                       'payment_currency': row['payment_currency'],
                       'amount_received': row['amount_received'], 'receiving_currency': row['receiving_currency'],
                       'document_id': row['document_id'], 'source_row': row['source_row']})
+        if row.get('extraction'):
+            edges[-1]['extraction'] = row['extraction']
+            edges[-1]['evidence'] = row.get('evidence')
         key = (row['sender_id'], row['receiver_id'], row['payment_currency'], row['receiving_currency'])
         total = totals[key]
         total[0] += 1

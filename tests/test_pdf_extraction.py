@@ -31,6 +31,31 @@ def pdf_bytes(pages=1, text=None):
     return output.getvalue()
 
 
+def test_embedded_export_is_canonical_and_disclosed(tmp_path, monkeypatch):
+    from pathlib import Path
+    from dolos.parsers import parse_document, DocumentError
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_attachment('dolos-transactions.csv', Path('examples/statement.csv').read_bytes())
+    path = tmp_path / 'export.pdf'
+    with path.open('wb') as output:
+        writer.write(output)
+    monkeypatch.setattr(pdf, '_client', lambda: pytest.fail('Embedded export must not call an LLM'))
+    rows = list(parse_document(path, '.pdf'))
+    assert len(rows) == 3
+    assert all(row and not error for _, row, error in rows)
+    assert rows[0][1]['extraction']['provider'] == 'embedded_csv'
+    assert rows[0][1]['evidence']['attachment'] == 'dolos-transactions.csv'
+    assert rows[0][1]['from_account'] == '000123'
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_attachment('dolos-transactions.csv', b'not,a,canonical,header\n1,2,3,4')
+    with path.open('wb') as output:
+        writer.write(output)
+    with pytest.raises(DocumentError, match='canonical CSV'):
+        list(parse_document(path, '.pdf'))
+
+
 def party(name, **kwargs):
     if isinstance(name, pdf.Party):
         return name

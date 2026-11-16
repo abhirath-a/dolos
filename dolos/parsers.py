@@ -75,6 +75,7 @@ def csv_rows(text):
 
 
 def parse_document(path, suffix):
+    attachment = None
     if suffix == '.pdf':
         from pypdf import PdfReader
         reader = PdfReader(path)
@@ -82,16 +83,30 @@ def parse_document(path, suffix):
             raise DocumentError('Encrypted PDF requires an unencrypted export.')
         if len(reader.pages) > 200:
             raise DocumentError('PDF exceeds 200 pages; split the statement.')
-        # Preserve deterministic ingestion for legacy canonical-table PDFs.
-        text = '\n'.join(page.extract_text() or '' for page in reader.pages)
-        first_line = text.splitlines()[0] if text.splitlines() else ''
-        header = next(csv.reader([first_line]), [])
-        if set(FIELDS).issubset(header) or tuple(header) == IBM_HEADER:
-            rows = csv_rows(text)
+        # Explicit machine-readable exports are parsed as source data, never as
+        # instructions. They undergo the same canonical validation as CSV uploads.
+        if 'dolos-transactions.csv' in reader.attachments:
+            exports = reader.attachments['dolos-transactions.csv']
+            if len(exports) != 1:
+                raise DocumentError('Expected exactly one dolos-transactions.csv attachment.')
+            if len(exports[0]) > 25 * 1024 * 1024:
+                raise DocumentError('Embedded transaction export exceeds 25 MiB.')
+            try:
+                rows = csv_rows(exports[0].decode('utf-8-sig'))
+            except UnicodeDecodeError as exc:
+                raise DocumentError('Embedded transaction export must use UTF-8.') from exc
+            attachment = 'dolos-transactions.csv'
         else:
-            from .pdf_extraction import extract_relations
-            yield from extract_relations(path, reader)
-            return
+            # Preserve deterministic ingestion for legacy canonical-table PDFs.
+            text = '\n'.join(page.extract_text() or '' for page in reader.pages)
+            first_line = text.splitlines()[0] if text.splitlines() else ''
+            header = next(csv.reader([first_line]), [])
+            if set(FIELDS).issubset(header) or tuple(header) == IBM_HEADER:
+                rows = csv_rows(text)
+            else:
+                from .pdf_extraction import extract_relations
+                yield from extract_relations(path, reader)
+                return
     elif suffix == '.csv':
         rows = csv_rows(path.read_text(encoding='utf-8-sig'))
     elif suffix == '.json':
@@ -108,6 +123,12 @@ def parse_document(path, suffix):
                 raise ValueError('Expected a transaction object')
             if '_error' in row:
                 raise ValueError(row['_error'])
-            yield index, normalize(row), None
+            normalized = normalize(row)
+            if attachment:
+                normalized['extraction'] = {'provider': 'embedded_csv', 'attachment': attachment,
+                    'verification': 'canonical_validation_only'}
+                normalized['evidence'] = {'attachment': attachment, 'row': index,
+                    'note': 'Parsed embedded export; visible PDF text was not independently reconciled.'}
+            yield index, normalized, None
         except (ValueError, TypeError, OverflowError) as exc:
             yield index, None, str(exc)

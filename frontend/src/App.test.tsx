@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import App from "./App";
 describe("graph-first entry", () => {
-  it("opens the sourced 1MDB case with its Hollywood connection", () => {
+  it("opens the compatible synthetic network with live model actions", () => {
     const dataset = JSON.parse(
       readFileSync(new URL("../public/cases.json", import.meta.url), "utf8"),
     );
@@ -22,10 +22,11 @@ describe("graph-first entry", () => {
         <App />
       </QueryClientProvider>,
     );
-    expect(html).toContain("<h1>1MDB</h1>");
-    expect(html).toContain("The Hollywood connection");
-    expect(html).toContain("Review source evidence");
-    expect(html).toContain("U.S. Department of Justice");
+    expect(html).toContain("The pass-through network");
+    expect(html).toContain("Synthetic teaching data");
+    expect(html).toContain("Run GraphSAGE");
+    expect(html).not.toContain("View recorded run");
+    expect(html).not.toContain('value="case:1mdb"');
     expect(html).toContain("Export visible");
     expect(html).toContain("Transaction ledger");
     expect(html).not.toContain("99%");

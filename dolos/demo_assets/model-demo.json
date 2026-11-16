@@ -1,0 +1,879 @@
+{
+  "id": "graphsage-simulation",
+  "title": "The pass-through network",
+  "description": "A simulated transaction network with repeated routing patterns. Inspect a real GraphSAGE prediction and its sampled historical neighborhood.",
+  "data_label": "Synthetic teaching data",
+  "execution_label": "Recorded model run",
+  "notice": "Generated teaching data and a small demonstration model. These are actual model outputs, not a real investigation or evidence of real-world accuracy.",
+  "generated_at": "2026-11-15T21:26:47.156119+00:00",
+  "source_sha256": "314fb67b8e4ce8e16c3873f61e1978ee9a5383945382cd2fd9ff81d276ceedfb",
+  "generator": "dolos/model_demo.py",
+  "source_rows": 2880,
+  "epochs": 8,
+  "run_id": "314fb67b8e4c-hourly-v1-2880-e8",
+  "artifact_sha256": {
+    "graph_xgboost.json": "9ca52fd8686044d31aaf0eebbc41747a9ff57fd5aabcf158ab40fe97c0359882",
+    "graphsage.pt": "9165f54b3f2da7bb362b53b3cdb204a4f0a59792d95cec8d239cb85a41654aba",
+    "graphsage_no_neighbors.pt": "0ebd541f060cf0c0ccd580ce49dfcd33c58a832c0c7590a2b65c9cbf28128e9e",
+    "transaction_xgboost.json": "2e9fc393ab37b9df4bc9d86562a4302c56160c4dd62a45070475bbd02916fb1e"
+  },
+  "focus_edge_id": "simulation:2847",
+  "graph": {
+    "nodes": [
+      {
+        "id": "[\"DEMO\",\"0001\"]",
+        "bank": "DEMO",
+        "account": "0001",
+        "label": "Account 0001",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0003\"]",
+        "bank": "DEMO",
+        "account": "0003",
+        "label": "Account 0003",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0005\"]",
+        "bank": "DEMO",
+        "account": "0005",
+        "label": "Account 0005",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0008\"]",
+        "bank": "DEMO",
+        "account": "0008",
+        "label": "Account 0008",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0017\"]",
+        "bank": "DEMO",
+        "account": "0017",
+        "label": "Account 0017",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0000\"]",
+        "bank": "DEMO",
+        "account": "0000",
+        "label": "Account 0000",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0014\"]",
+        "bank": "DEMO",
+        "account": "0014",
+        "label": "Account 0014",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      },
+      {
+        "id": "[\"DEMO\",\"0015\"]",
+        "bank": "DEMO",
+        "account": "0015",
+        "label": "Account 0015",
+        "kind": "account",
+        "identity_basis": "bank_account",
+        "resolution_status": "exact_identifier"
+      }
+    ],
+    "edges": [
+      {
+        "id": "simulation:2798",
+        "source": "[\"DEMO\",\"0001\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T17:04:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2798
+      },
+      {
+        "id": "simulation:2799",
+        "source": "[\"DEMO\",\"0003\"]",
+        "target": "[\"DEMO\",\"0005\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T17:08:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2799
+      },
+      {
+        "id": "simulation:2800",
+        "source": "[\"DEMO\",\"0005\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T17:12:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2800
+      },
+      {
+        "id": "simulation:2805",
+        "source": "[\"DEMO\",\"0008\"]",
+        "target": "[\"DEMO\",\"0017\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T17:32:00.000000+00:00",
+        "amount_paid": "2998",
+        "payment_currency": "USD",
+        "amount_received": "2998",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2805
+      },
+      {
+        "id": "simulation:2809",
+        "source": "[\"DEMO\",\"0000\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T18:00:00.000000+00:00",
+        "amount_paid": "8100",
+        "payment_currency": "USD",
+        "amount_received": "8100",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2809
+      },
+      {
+        "id": "simulation:2810",
+        "source": "[\"DEMO\",\"0001\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T18:04:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2810
+      },
+      {
+        "id": "simulation:2811",
+        "source": "[\"DEMO\",\"0003\"]",
+        "target": "[\"DEMO\",\"0005\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T18:08:00.000000+00:00",
+        "amount_paid": "9200",
+        "payment_currency": "USD",
+        "amount_received": "9200",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2811
+      },
+      {
+        "id": "simulation:2812",
+        "source": "[\"DEMO\",\"0005\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T18:12:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2812
+      },
+      {
+        "id": "simulation:2821",
+        "source": "[\"DEMO\",\"0000\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T19:00:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2821
+      },
+      {
+        "id": "simulation:2822",
+        "source": "[\"DEMO\",\"0001\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T19:04:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2822
+      },
+      {
+        "id": "simulation:2823",
+        "source": "[\"DEMO\",\"0003\"]",
+        "target": "[\"DEMO\",\"0005\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T19:08:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2823
+      },
+      {
+        "id": "simulation:2824",
+        "source": "[\"DEMO\",\"0005\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T19:12:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2824
+      },
+      {
+        "id": "simulation:2831",
+        "source": "[\"DEMO\",\"0008\"]",
+        "target": "[\"DEMO\",\"0014\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T19:40:00.000000+00:00",
+        "amount_paid": "7158",
+        "payment_currency": "USD",
+        "amount_received": "7158",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2831
+      },
+      {
+        "id": "simulation:2833",
+        "source": "[\"DEMO\",\"0000\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T20:00:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2833
+      },
+      {
+        "id": "simulation:2834",
+        "source": "[\"DEMO\",\"0001\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T20:04:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2834
+      },
+      {
+        "id": "simulation:2835",
+        "source": "[\"DEMO\",\"0003\"]",
+        "target": "[\"DEMO\",\"0005\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T20:08:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2835
+      },
+      {
+        "id": "simulation:2836",
+        "source": "[\"DEMO\",\"0005\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T20:12:00.000000+00:00",
+        "amount_paid": "8400",
+        "payment_currency": "USD",
+        "amount_received": "8400",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2836
+      },
+      {
+        "id": "simulation:2838",
+        "source": "[\"DEMO\",\"0015\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T20:20:00.000000+00:00",
+        "amount_paid": "8166",
+        "payment_currency": "USD",
+        "amount_received": "8166",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2838
+      },
+      {
+        "id": "simulation:2845",
+        "source": "[\"DEMO\",\"0000\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T21:00:00.000000+00:00",
+        "amount_paid": "8100",
+        "payment_currency": "USD",
+        "amount_received": "8100",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2845
+      },
+      {
+        "id": "simulation:2846",
+        "source": "[\"DEMO\",\"0001\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T21:04:00.000000+00:00",
+        "amount_paid": "9200",
+        "payment_currency": "USD",
+        "amount_received": "9200",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2846
+      },
+      {
+        "id": "simulation:2847",
+        "source": "[\"DEMO\",\"0003\"]",
+        "target": "[\"DEMO\",\"0005\"]",
+        "relation": "transfer",
+        "timestamp": "2025-01-15T21:08:00.000000+00:00",
+        "amount_paid": "8700",
+        "payment_currency": "USD",
+        "amount_received": "8700",
+        "receiving_currency": "USD",
+        "document_id": "synthetic-transfers.csv",
+        "source_row": 2847
+      }
+    ],
+    "summaries": [
+      {
+        "source": "[\"DEMO\",\"0000\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 4,
+        "amount_paid": "33000",
+        "amount_received": "33000"
+      },
+      {
+        "source": "[\"DEMO\",\"0001\"]",
+        "target": "[\"DEMO\",\"0003\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 5,
+        "amount_paid": "43700",
+        "amount_received": "43700"
+      },
+      {
+        "source": "[\"DEMO\",\"0003\"]",
+        "target": "[\"DEMO\",\"0005\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 5,
+        "amount_paid": "43700",
+        "amount_received": "43700"
+      },
+      {
+        "source": "[\"DEMO\",\"0005\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 4,
+        "amount_paid": "33900",
+        "amount_received": "33900"
+      },
+      {
+        "source": "[\"DEMO\",\"0008\"]",
+        "target": "[\"DEMO\",\"0014\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 1,
+        "amount_paid": "7158",
+        "amount_received": "7158"
+      },
+      {
+        "source": "[\"DEMO\",\"0008\"]",
+        "target": "[\"DEMO\",\"0017\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 1,
+        "amount_paid": "2998",
+        "amount_received": "2998"
+      },
+      {
+        "source": "[\"DEMO\",\"0015\"]",
+        "target": "[\"DEMO\",\"0008\"]",
+        "payment_currency": "USD",
+        "receiving_currency": "USD",
+        "count": 1,
+        "amount_paid": "8166",
+        "amount_received": "8166"
+      }
+    ],
+    "relation_summaries": []
+  },
+  "models": {
+    "graphsage": {
+      "model": "graphsage",
+      "run_id": "314fb67b8e4c-hourly-v1-2880-e8",
+      "score_type": "raw_margin",
+      "history_rows": 2880,
+      "scores": [
+        {
+          "transaction_id": "simulation:2847",
+          "score": 12.484939575195312,
+          "context_cutoff_us": 1736974800000000,
+          "explanation": {
+            "kind": "graph_context",
+            "context_transaction_ids": [
+              "simulation:2799",
+              "simulation:2800",
+              "simulation:2805",
+              "simulation:2811",
+              "simulation:2812",
+              "simulation:2821",
+              "simulation:2822",
+              "simulation:2823",
+              "simulation:2824",
+              "simulation:2831",
+              "simulation:2833",
+              "simulation:2834",
+              "simulation:2835",
+              "simulation:2836",
+              "simulation:2838"
+            ],
+            "context_transactions": [
+              {
+                "timestamp": "2025-01-15T17:08:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0003",
+                "to_bank": "DEMO",
+                "to_account": "0005",
+                "amount_received": "8700",
+                "receiving_currency": "USD",
+                "amount_paid": "8700",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0003\"]",
+                "receiver_id": "[\"DEMO\",\"0005\"]",
+                "reference": null,
+                "id": "simulation:2799",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2799,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T17:12:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0005",
+                "to_bank": "DEMO",
+                "to_account": "0008",
+                "amount_received": "8700",
+                "receiving_currency": "USD",
+                "amount_paid": "8700",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0005\"]",
+                "receiver_id": "[\"DEMO\",\"0008\"]",
+                "reference": null,
+                "id": "simulation:2800",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2800,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T17:32:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0008",
+                "to_bank": "DEMO",
+                "to_account": "0017",
+                "amount_received": "2998",
+                "receiving_currency": "USD",
+                "amount_paid": "2998",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0008\"]",
+                "receiver_id": "[\"DEMO\",\"0017\"]",
+                "reference": null,
+                "id": "simulation:2805",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2805,
+                "hop": 2
+              },
+              {
+                "timestamp": "2025-01-15T18:08:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0003",
+                "to_bank": "DEMO",
+                "to_account": "0005",
+                "amount_received": "9200",
+                "receiving_currency": "USD",
+                "amount_paid": "9200",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0003\"]",
+                "receiver_id": "[\"DEMO\",\"0005\"]",
+                "reference": null,
+                "id": "simulation:2811",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2811,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T18:12:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0005",
+                "to_bank": "DEMO",
+                "to_account": "0008",
+                "amount_received": "8400",
+                "receiving_currency": "USD",
+                "amount_paid": "8400",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0005\"]",
+                "receiver_id": "[\"DEMO\",\"0008\"]",
+                "reference": null,
+                "id": "simulation:2812",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2812,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T19:00:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0000",
+                "to_bank": "DEMO",
+                "to_account": "0003",
+                "amount_received": "8400",
+                "receiving_currency": "USD",
+                "amount_paid": "8400",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0000\"]",
+                "receiver_id": "[\"DEMO\",\"0003\"]",
+                "reference": null,
+                "id": "simulation:2821",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2821,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T19:04:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0001",
+                "to_bank": "DEMO",
+                "to_account": "0003",
+                "amount_received": "8700",
+                "receiving_currency": "USD",
+                "amount_paid": "8700",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0001\"]",
+                "receiver_id": "[\"DEMO\",\"0003\"]",
+                "reference": null,
+                "id": "simulation:2822",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2822,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T19:08:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0003",
+                "to_bank": "DEMO",
+                "to_account": "0005",
+                "amount_received": "8400",
+                "receiving_currency": "USD",
+                "amount_paid": "8400",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0003\"]",
+                "receiver_id": "[\"DEMO\",\"0005\"]",
+                "reference": null,
+                "id": "simulation:2823",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2823,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T19:12:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0005",
+                "to_bank": "DEMO",
+                "to_account": "0008",
+                "amount_received": "8400",
+                "receiving_currency": "USD",
+                "amount_paid": "8400",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0005\"]",
+                "receiver_id": "[\"DEMO\",\"0008\"]",
+                "reference": null,
+                "id": "simulation:2824",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2824,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T19:40:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0008",
+                "to_bank": "DEMO",
+                "to_account": "0014",
+                "amount_received": "7158",
+                "receiving_currency": "USD",
+                "amount_paid": "7158",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0008\"]",
+                "receiver_id": "[\"DEMO\",\"0014\"]",
+                "reference": null,
+                "id": "simulation:2831",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2831,
+                "hop": 2
+              },
+              {
+                "timestamp": "2025-01-15T20:00:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0000",
+                "to_bank": "DEMO",
+                "to_account": "0003",
+                "amount_received": "8400",
+                "receiving_currency": "USD",
+                "amount_paid": "8400",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0000\"]",
+                "receiver_id": "[\"DEMO\",\"0003\"]",
+                "reference": null,
+                "id": "simulation:2833",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2833,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T20:04:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0001",
+                "to_bank": "DEMO",
+                "to_account": "0003",
+                "amount_received": "8700",
+                "receiving_currency": "USD",
+                "amount_paid": "8700",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0001\"]",
+                "receiver_id": "[\"DEMO\",\"0003\"]",
+                "reference": null,
+                "id": "simulation:2834",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2834,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T20:08:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0003",
+                "to_bank": "DEMO",
+                "to_account": "0005",
+                "amount_received": "8700",
+                "receiving_currency": "USD",
+                "amount_paid": "8700",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0003\"]",
+                "receiver_id": "[\"DEMO\",\"0005\"]",
+                "reference": null,
+                "id": "simulation:2835",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2835,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T20:12:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0005",
+                "to_bank": "DEMO",
+                "to_account": "0008",
+                "amount_received": "8400",
+                "receiving_currency": "USD",
+                "amount_paid": "8400",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0005\"]",
+                "receiver_id": "[\"DEMO\",\"0008\"]",
+                "reference": null,
+                "id": "simulation:2836",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2836,
+                "hop": 1
+              },
+              {
+                "timestamp": "2025-01-15T20:20:00.000000+00:00",
+                "from_bank": "DEMO",
+                "from_account": "0015",
+                "to_bank": "DEMO",
+                "to_account": "0008",
+                "amount_received": "8166",
+                "receiving_currency": "USD",
+                "amount_paid": "8166",
+                "payment_currency": "USD",
+                "payment_format": "WIRE",
+                "sender_id": "[\"DEMO\",\"0015\"]",
+                "receiver_id": "[\"DEMO\",\"0008\"]",
+                "reference": null,
+                "id": "simulation:2838",
+                "document_id": "synthetic-transfers.csv",
+                "source_row": 2838,
+                "hop": 2
+              }
+            ],
+            "cutoff_us": 1736974800000000,
+            "note": "Actual historical neighbors sampled for the two GraphSAGE layers. Context membership is not a causal attribution."
+          }
+        }
+      ],
+      "status": "completed",
+      "name": "graphsage",
+      "threshold": 0
+    },
+    "graph_xgboost": {
+      "model": "graph_xgboost",
+      "run_id": "314fb67b8e4c-hourly-v1-2880-e8",
+      "score_type": "raw_margin",
+      "history_rows": 2880,
+      "scores": [
+        {
+          "transaction_id": "simulation:2847",
+          "score": 7.038912296295166,
+          "context_cutoff_us": 1736974800000000,
+          "explanation": {
+            "kind": "tree_shap",
+            "base_margin": -0.8427780866622925,
+            "contribution_sum": 7.881691932678223,
+            "tree_count": 150,
+            "tree_paths": [
+              {
+                "tree": 1,
+                "steps": [
+                  {
+                    "feature": "Sender outgoing USD signed log mean",
+                    "value": 1.8117599487304688,
+                    "threshold": 1.80722129,
+                    "branch": "greater_or_equal"
+                  }
+                ],
+                "leaf_margin": 0.233717307
+              },
+              {
+                "tree": 2,
+                "steps": [
+                  {
+                    "feature": "Sender outgoing USD signed log mean",
+                    "value": 1.8117599487304688,
+                    "threshold": 1.80722129,
+                    "branch": "greater_or_equal"
+                  }
+                ],
+                "leaf_margin": 0.201572224
+              },
+              {
+                "tree": 3,
+                "steps": [
+                  {
+                    "feature": "Sender outgoing USD signed log mean",
+                    "value": 1.8117599487304688,
+                    "threshold": 1.78295219,
+                    "branch": "greater_or_equal"
+                  },
+                  {
+                    "feature": "Log received amount",
+                    "value": 9.07119369506836,
+                    "threshold": 8.81936932,
+                    "branch": "greater_or_equal"
+                  }
+                ],
+                "leaf_margin": 0.179916799
+              }
+            ],
+            "features": [
+              {
+                "name": "Sender outgoing USD signed log mean",
+                "value": 1.8117599487304688,
+                "contribution": 5.407937049865723
+              },
+              {
+                "name": "Log received amount",
+                "value": 9.07119369506836,
+                "contribution": 0.9796836972236633
+              },
+              {
+                "name": "Sender incoming USD log standard deviation",
+                "value": 1.2080878019332886,
+                "contribution": 0.5530921220779419
+              },
+              {
+                "name": "Sender outgoing USD log standard deviation",
+                "value": 1.2046120166778564,
+                "contribution": 0.4289667308330536
+              },
+              {
+                "name": "Receiver incoming USD signed log total",
+                "value": 2.905348777770996,
+                "contribution": 0.38178348541259766
+              },
+              {
+                "name": "Sender incoming log count",
+                "value": 1.2326630353927612,
+                "contribution": -0.16199825704097748
+              },
+              {
+                "name": "Receiver incoming USD signed log mean",
+                "value": 1.8117599487304688,
+                "contribution": 0.14218561351299286
+              },
+              {
+                "name": "Sender outgoing log count",
+                "value": 1.0944541692733765,
+                "contribution": -0.10654224455356598
+              }
+            ],
+            "note": "TreeSHAP contributions add to the raw margin with the base value. Top eight shown; omitted features still contribute. Values are transformed model inputs, not raw statement amounts. These are model attributions, not causal evidence."
+          }
+        }
+      ],
+      "status": "completed",
+      "name": "graph_xgboost",
+      "threshold": 0
+    }
+  },
+  "provenance": {
+    "kind": "synthetic",
+    "license": "Project-generated teaching fixture",
+    "training_policy": "Chronological train/validation/test splits; test predictions occur after model selection. Labels describe generated routing motifs."
+  }
+}

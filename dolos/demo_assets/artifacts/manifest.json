@@ -1,0 +1,357 @@
+{
+  "runtime": {
+    "numpy": "2.0.2",
+    "polars": "1.32.3",
+    "torch": "2.8.0",
+    "torch-geometric": "2.6.1",
+    "scikit-learn": "1.6.1",
+    "xgboost": "2.1.4"
+  },
+  "hardware": "arm64",
+  "device": "cpu",
+  "threads": 4,
+  "wall_seconds": 7.28,
+  "run_id": "314fb67b8e4c-hourly-v1-2880-e8",
+  "source_rows": 2880,
+  "scope_end_us": null,
+  "source_sha256": "314fb67b8e4ce8e16c3873f61e1978ee9a5383945382cd2fd9ff81d276ceedfb",
+  "feature_version": "hourly-v1",
+  "seed": 7,
+  "time_basis": "synthetic naive epoch microseconds",
+  "bucket_us": 3600000000,
+  "validation_start_us": 1736726400000000,
+  "test_start_us": 1736856000000000,
+  "training_cutoff_us": 1736726400000000,
+  "selection_cutoff_us": 1736856000000000,
+  "vocabularies": {
+    "receiving_currency": [
+      "USD"
+    ],
+    "payment_currency": [
+      "USD"
+    ],
+    "payment_format": [
+      "WIRE"
+    ]
+  },
+  "graph_policy": "Both hops use the same cutoff. Directional means. Repeats contribute multiple messages, including self-edges in both roles.",
+  "fanouts_per_direction": [
+    4,
+    2
+  ],
+  "currency_policy": "Training vocabulary, per-currency amount history",
+  "review_budget": 100,
+  "epochs": 8,
+  "selected_epochs": {
+    "graphsage": 1,
+    "graphsage_no_neighbors": 1
+  },
+  "splits": {
+    "train": {
+      "rows": 2016,
+      "positives": 672,
+      "start_us": 1736121600000000,
+      "end_us": 1736725440000000
+    },
+    "validation": {
+      "rows": 432,
+      "positives": 144,
+      "start_us": 1736726400000000,
+      "end_us": 1736855040000000
+    },
+    "test": {
+      "rows": 432,
+      "positives": 144,
+      "start_us": 1736856000000000,
+      "end_us": 1736984640000000
+    }
+  },
+  "metrics": {
+    "currency_rule": {
+      "rows": 432,
+      "positives": 144,
+      "prevalence": 0.3333333333333333,
+      "average_precision": 0.8207196690086249,
+      "pr_auc_trapezoid": 0.651213673613066,
+      "precision_at_50": 0.9,
+      "precision_at_100": 0.78,
+      "precision_at_500": null,
+      "precision_at_1000": null,
+      "recall_at_100": 0.5416666666666666,
+      "confusion_at_100": {
+        "tp": 78,
+        "fp": 22,
+        "fn": 66,
+        "tn": 266
+      },
+      "coverage": 1.0,
+      "history_subgroups": {
+        "0": {
+          "rows": 432,
+          "positives": 144,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 0.8207196690086249,
+          "pr_auc_trapezoid": 0.651213673613066,
+          "precision_at_50": 0.9,
+          "precision_at_100": 0.78,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      },
+      "daily": {
+        "0": {
+          "rows": 288,
+          "positives": 96,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 0.8188288681809358,
+          "pr_auc_trapezoid": 0.6244930203760288,
+          "precision_at_50": 0.72,
+          "precision_at_100": 0.75,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        },
+        "1": {
+          "rows": 144,
+          "positives": 48,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 0.8444099378881986,
+          "pr_auc_trapezoid": 0.7203316368592639,
+          "precision_at_50": 0.78,
+          "precision_at_100": 0.48,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      }
+    },
+    "transaction_xgboost": {
+      "rows": 432,
+      "positives": 144,
+      "prevalence": 0.3333333333333333,
+      "average_precision": 0.9769992166915902,
+      "pr_auc_trapezoid": 0.9825118917986027,
+      "precision_at_50": 1.0,
+      "precision_at_100": 0.98,
+      "precision_at_500": null,
+      "precision_at_1000": null,
+      "recall_at_100": 0.6805555555555556,
+      "confusion_at_100": {
+        "tp": 98,
+        "fp": 2,
+        "fn": 46,
+        "tn": 286
+      },
+      "coverage": 1.0,
+      "history_subgroups": {
+        "0": {
+          "rows": 432,
+          "positives": 144,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 0.9769992166915902,
+          "pr_auc_trapezoid": 0.9825118917986027,
+          "precision_at_50": 1.0,
+          "precision_at_100": 0.98,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      },
+      "daily": {
+        "0": {
+          "rows": 288,
+          "positives": 96,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 0.9846120362222373,
+          "pr_auc_trapezoid": 0.9876609836732928,
+          "precision_at_50": 1.0,
+          "precision_at_100": 0.96,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        },
+        "1": {
+          "rows": 144,
+          "positives": 48,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 0.9628330206378987,
+          "pr_auc_trapezoid": 0.9705933395872419,
+          "precision_at_50": 0.94,
+          "precision_at_100": 0.48,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      }
+    },
+    "graph_xgboost": {
+      "rows": 432,
+      "positives": 144,
+      "prevalence": 0.3333333333333333,
+      "average_precision": 1.0,
+      "pr_auc_trapezoid": 1.0,
+      "precision_at_50": 1.0,
+      "precision_at_100": 1.0,
+      "precision_at_500": null,
+      "precision_at_1000": null,
+      "recall_at_100": 0.6944444444444444,
+      "confusion_at_100": {
+        "tp": 100,
+        "fp": 0,
+        "fn": 44,
+        "tn": 288
+      },
+      "coverage": 1.0,
+      "history_subgroups": {
+        "0": {
+          "rows": 432,
+          "positives": 144,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 1.0,
+          "precision_at_100": 1.0,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      },
+      "daily": {
+        "0": {
+          "rows": 288,
+          "positives": 96,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 1.0,
+          "precision_at_100": 0.96,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        },
+        "1": {
+          "rows": 144,
+          "positives": 48,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 0.96,
+          "precision_at_100": 0.48,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      }
+    },
+    "graphsage": {
+      "rows": 432,
+      "positives": 144,
+      "prevalence": 0.3333333333333333,
+      "average_precision": 1.0,
+      "pr_auc_trapezoid": 1.0,
+      "precision_at_50": 1.0,
+      "precision_at_100": 1.0,
+      "precision_at_500": null,
+      "precision_at_1000": null,
+      "recall_at_100": 0.6944444444444444,
+      "confusion_at_100": {
+        "tp": 100,
+        "fp": 0,
+        "fn": 44,
+        "tn": 288
+      },
+      "coverage": 1.0,
+      "history_subgroups": {
+        "0": {
+          "rows": 432,
+          "positives": 144,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 1.0,
+          "precision_at_100": 1.0,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      },
+      "daily": {
+        "0": {
+          "rows": 288,
+          "positives": 96,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 1.0,
+          "precision_at_100": 0.96,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        },
+        "1": {
+          "rows": 144,
+          "positives": 48,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 0.96,
+          "precision_at_100": 0.48,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      }
+    },
+    "graphsage_no_neighbors": {
+      "rows": 432,
+      "positives": 144,
+      "prevalence": 0.3333333333333333,
+      "average_precision": 1.0,
+      "pr_auc_trapezoid": 1.0,
+      "precision_at_50": 1.0,
+      "precision_at_100": 1.0,
+      "precision_at_500": null,
+      "precision_at_1000": null,
+      "recall_at_100": 0.6944444444444444,
+      "confusion_at_100": {
+        "tp": 100,
+        "fp": 0,
+        "fn": 44,
+        "tn": 288
+      },
+      "coverage": 1.0,
+      "history_subgroups": {
+        "0": {
+          "rows": 432,
+          "positives": 144,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 1.0,
+          "precision_at_100": 1.0,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      },
+      "daily": {
+        "0": {
+          "rows": 288,
+          "positives": 96,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 1.0,
+          "precision_at_100": 0.96,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        },
+        "1": {
+          "rows": 144,
+          "positives": 48,
+          "prevalence": 0.3333333333333333,
+          "average_precision": 1.0,
+          "pr_auc_trapezoid": 1.0,
+          "precision_at_50": 0.96,
+          "precision_at_100": 0.48,
+          "precision_at_500": null,
+          "precision_at_1000": null
+        }
+      }
+    }
+  },
+  "artifact_sha256": {
+    "graph_xgboost.json": "9ca52fd8686044d31aaf0eebbc41747a9ff57fd5aabcf158ab40fe97c0359882",
+    "graphsage.pt": "9165f54b3f2da7bb362b53b3cdb204a4f0a59792d95cec8d239cb85a41654aba",
+    "graphsage_no_neighbors.pt": "0ebd541f060cf0c0ccd580ce49dfcd33c58a832c0c7590a2b65c9cbf28128e9e",
+    "transaction_xgboost.json": "2e9fc393ab37b9df4bc9d86562a4302c56160c4dd62a45070475bbd02916fb1e"
+  }
+}
