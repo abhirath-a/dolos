@@ -16,7 +16,7 @@ A spreadsheet shows individual payments. It is harder to see how money moves bet
 
 ## Try it as a judge
 
-Choose an example, click **Run GraphSAGE**, and inspect a scored transfer. Open its model context to see the actual historical neighbors used. Switch to **Graph XGBoost**, run it, and inspect feature contributions and decision-tree branches.
+Choose an example, click **Analyze network**, and inspect a scored transfer. Dolos runs one pipeline: **GraphSAGE encodes the neighborhood → XGBoost makes the final decision**. Each score credits the graph-derived features and direct transaction fields. The highest-ranked results also include actual sampled neighbors and decision-tree branches.
 
 | Live example | What to explore |
 | --- | --- |
@@ -33,24 +33,23 @@ To test uploads, download the mock pack and upload its four PDFs together. They 
 
 1. **Ingest:** upload PDF, CSV or JSON statements. A durable database queue lets a separate worker process batches.
 2. **Connect:** accounts become nodes; transfers become directed edges. Records retain source-document and row/page provenance where available.
-3. **Score:** directed GraphSAGE learns incoming and outgoing neighborhood representations. Graph-aware XGBoost combines transaction fields with historical account features. Both use history before the target hour to avoid future leakage.
-4. **Explain:** GraphSAGE exposes sampled historical context. XGBoost exposes TreeSHAP contributions and actual tree paths. Context is not causal attribution, and raw model margins are not confidence percentages.
+3. **Score:** directed GraphSAGE produces 128 sender/receiver embedding values from history before the target hour. One XGBoost classifier consumes those embeddings and eight direct transaction features to make the final decision. The neural encoder is frozen; the final classifier is trained offline on the chronological training partition.
+4. **Explain:** grouped TreeSHAP credits GraphSAGE-derived features and direct transaction fields for each score; those credits plus the baseline add to the final margin. GraphSAGE supplies neighborhood representations; XGBoost supplies the final decision and attributions. Neither feature credit nor context membership proves causation, and margins are not confidence percentages.
 
-We expanded the notebook into an application with batch ingestion, flexible PDF extraction, durable jobs, an interactive graph, live model comparisons, explanations, and lightweight inference for deployment. React/TanStack Query power the frontend; FastAPI serves the API on Vercel; Railway runs the worker; Turso stores records/jobs; Cloudflare R2 stores documents.
+We expanded the notebook into an application with a stacked GraphSAGE-to-XGBoost model, batch ingestion, flexible PDF extraction, durable jobs, an interactive graph, explanations, and lightweight inference for deployment. React/TanStack Query power the frontend; FastAPI serves the API on Vercel; Railway runs the worker; Turso stores records/jobs; Cloudflare R2 stores documents.
 
 ## Results and model provenance
 
-The notebook's **saved IBM AMLworld HI-Small benchmark** reports:
+The notebook now compares **one baseline and the final hybrid** on the same 432 test transfers. The executed default run uses 2,880 generated source transfers:
 
-| Model | Average precision | Labeled cases in the top 100 alerts |
+| Model | Average precision | Precision at 100 |
 | --- | ---: | ---: |
-| Transaction-only XGBoost | 0.1359 | 54 |
-| Graph-aware XGBoost | 0.4755 | 98 |
-| Directed GraphSAGE | 0.2428 | 83 |
+| Baseline: transaction-only XGBoost | 0.976999 | 0.980 |
+| Final: GraphSAGE → XGBoost | 1.000000 | 1.000 |
 
-These are saved notebook results, not a newly rerun benchmark or whole-dataset accuracy. Graph-aware XGBoost had the strongest recorded ranking.
+These are synthetic-data results, not IBM results or whole-dataset accuracy. The notebook uses 2,016 training rows, 432 validation rows and 432 test rows. Test labels do not select weights or checkpoints. The simple generator does not establish real-world accuracy. The optional IBM data mode needs a separate run.
 
-**The website uses the same architectures with separate weights trained on our generated teaching data, not the IBM-trained weights.** In the mock pack's final-hour window, both models flagged four generated routing transfers and left eight ordinary transfers below the decision boundary. This checks the demo pipeline, not real-world effectiveness. [Reproducible validation](output/pdf/validation.json)
+**The website uses a new stacked hybrid trained on our generated teaching data, not the IBM-trained notebook weights.** Its frozen GraphSAGE encoder feeds a separately fitted XGBoost decision head. The hybrid flags four routing transfers and leaves eight ordinary transfers below the boundary in the mock pack's final-hour window. This checks the demo pipeline, not real-world effectiveness. [Reproducible validation](output/pdf/validation.json)
 
 GraphSAGE's deployment runtime evaluates its trained tensors with NumPy. It matched the original PyTorch implementation within 0.000003 on the tested held-out demo rows, with identical decisions. XGBoost uses its native CPU runtime.
 
@@ -62,7 +61,7 @@ Next steps are to deploy and evaluate the IBM-trained artifacts, test more state
 
 ## Credits
 
-- **Data:** [IBM AMLworld / Erik Altman](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml) for the notebook benchmark. Website and mock-statement data are generated by [our fixture generator](dolos/model_demo.py); no real bank records are included.
+- **Data:** [IBM AMLworld / Erik Altman](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml) is the optional external notebook source. The executed default notebook, website and mock statements use [our fixture generator](dolos/model_demo.py); no real bank records are included.
 - **Models:** [GraphSAGE / PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.SAGEConv.html), [PyTorch](https://pytorch.org/), [XGBoost](https://xgboost.readthedocs.io/), and [scikit-learn](https://scikit-learn.org/). The demo AML weights are trained on our synthetic data, not externally pretrained AML weights.
 - **PDF extraction:** [NVIDIA Nemotron 3.5 Super VL (free), through OpenRouter](https://openrouter.ai/nvidia/nemotron-3.5-super-vl:free). The configured/resolved extraction model is recorded with extracted relations; this model extracts transactions rather than deciding laundering risk.
 - **AI assistance:** [OpenAI Codex](https://openai.com/codex/) and [ChatGPT](https://chatgpt.com/) assisted implementation, debugging, tests and documentation. [Impeccable](https://impeccable.style/) supplied interface-design guidance.

@@ -51,6 +51,15 @@ def build_demo(output=None, epochs=8):
     artifacts = work / (fingerprint[:12] + '-e' + str(epochs))
     if not (artifacts / 'manifest.json').exists():
         run(source, artifacts, epochs=epochs, batch_size=192)
+    if not (artifacts / 'graphsage.npz').exists():
+        import numpy as np
+        import torch
+        state = torch.load(artifacts / 'graphsage.pt', map_location='cpu', weights_only=True)
+        np.savez_compressed(artifacts / 'graphsage.npz',
+                            **{name: value.detach().cpu().numpy() for name, value in state.items()})
+    if not all((artifacts / name).is_file() for name in ('hybrid_xgboost.json', 'hybrid_manifest.json')):
+        from .hybrid import train_hybrid
+        train_hybrid(artifacts, source)
     rows = []
     for index, row, error in parse_document(source, '.csv'):
         if error:
@@ -108,6 +117,8 @@ def add_examples(payload, rows, artifacts):
     """
     from .graph import build_graph
     from .inference import score
+    payload['description'] = 'A simulated routing network analyzed by one hybrid: GraphSAGE encodes historical neighborhoods and XGBoost makes the final decision.'
+    payload['notice'] = 'Generated teaching data and a synthetic-trained GraphSAGE-to-XGBoost hybrid. Live outputs are not a real investigation, IBM benchmark results, or evidence of real-world accuracy.'
     latest = datetime.fromisoformat(rows[-1]['timestamp']).replace(minute=0, second=0, microsecond=0)
     window = [row for row in rows if datetime.fromisoformat(row['timestamp']) >= latest]
     incoming = [row for row in window if row['from_account'] in {'0000', '0001'} and row['to_account'] == '0003']
@@ -130,7 +141,7 @@ def add_examples(payload, rows, artifacts):
             raise ValueError('Example source does not contain the required synthetic window.')
         target_ids = {row['id'] for row in targets}
         display_ids = set(target_ids)
-        for model in ('graphsage', 'graph_xgboost'):
+        for model in ('hybrid',):
             prediction = score(rows, artifacts, model, len(targets), target_ids=target_ids, explain=True)
             if {item['transaction_id'] for item in prediction['scores']} != target_ids:
                 raise ValueError('Every example target must be eligible for both frozen models.')
@@ -143,6 +154,11 @@ def add_examples(payload, rows, artifacts):
                          'focus_edge_id': targets[0]['id'],
                          'focus_edge_ids': [row['id'] for row in targets], 'graph': graph})
     payload['examples'] = examples
+    hybrid_manifest = Path(artifacts) / 'hybrid_manifest.json'
+    if hybrid_manifest.is_file():
+        payload['hybrid_run_id'] = json.loads(hybrid_manifest.read_text())['run_id']
+        hybrid = score(rows, artifacts, 'hybrid', 1, target_ids={payload['focus_edge_id']}, explain=True)
+        payload['models']['hybrid'] = dict(hybrid, status='completed', name='hybrid', threshold=0)
     return payload
 
 
@@ -167,7 +183,9 @@ def export_runtime_bundle(root, payload, artifacts, source):
     """Ship small trained weights and source with deployments, not ignored var files."""
     target = root / 'dolos' / 'demo_assets'
     (target / 'artifacts').mkdir(parents=True, exist_ok=True)
-    for name in ('manifest.json', 'graphsage.pt', 'graph_xgboost.json'):
+    for name in ('manifest.json', 'graphsage.pt', 'graph_xgboost.json', 'hybrid_xgboost.json', 'hybrid_manifest.json'):
+        if not (artifacts / name).is_file() and name.startswith('hybrid_'):
+            continue
         shutil.copyfile(artifacts / name, target / 'artifacts' / name)
     exported = artifacts / 'graphsage.npz'
     if exported.is_file():
@@ -196,11 +214,11 @@ def demo_paths():
     default_directory = package / 'artifacts' if (package / 'artifacts').is_dir() else root / 'var' / 'model-demo' / (data['source_sha256'][:12] + '-e' + str(data.get('epochs', 8)))
     directory = Path(os.environ.get('DOLOS_DEMO_MODEL_DIR', str(default_directory)))
     source = Path(os.environ.get('DOLOS_DEMO_SOURCE_CSV', str(package / 'synthetic-transfers.csv' if package.is_dir() else root / 'var' / 'model-demo' / 'synthetic-transfers.csv')))
-    ready = directory if all((directory / name).is_file() for name in ('manifest.json', 'graphsage.npz', 'graph_xgboost.json')) and source.is_file() else None
+    ready = directory if all((directory / name).is_file() for name in ('manifest.json', 'graphsage.npz', 'hybrid_xgboost.json', 'hybrid_manifest.json')) and source.is_file() else None
     return data, ready, source
 
 
-def analyze_demo(model, example=None):
+def analyze_demo(model='hybrid', example=None):
     from .inference import score, ModelUnavailable
     from .parsers import parse_document
     data, directory, source = demo_paths()
@@ -208,7 +226,7 @@ def analyze_demo(model, example=None):
     if example and selected is None:
         raise ValueError('Unknown model example.')
     if not directory:
-        raise ModelUnavailable('Live demonstration artifacts are not installed. Deploy the packaged demo_assets including graphsage.npz; no recorded prediction was substituted.')
+        raise ModelUnavailable('Live hybrid artifacts are not installed. Deploy the GraphSAGE encoder, hybrid XGBoost model and matching manifests; no recorded prediction was substituted.')
     if hashlib.sha256(source.read_bytes()).hexdigest() != data['source_sha256']:
         raise ModelUnavailable('Demo source fingerprint differs from the recorded graph. Regenerate the demo.')
     manifest = json.loads((directory / 'manifest.json').read_text())

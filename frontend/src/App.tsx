@@ -19,7 +19,7 @@ import {
   Play,
 } from "lucide-react";
 import { api, graphForBatches, jsonPost } from "./api";
-import { demoAnalysis, modelNames, withContext, visibleExport } from "./domain";
+import { demoAnalysis, withContext, visibleExport } from "./domain";
 import {
   label,
   type Analysis,
@@ -92,7 +92,7 @@ export default function App() {
   const [investigations, setInvestigations] = useState<Investigation[]>(
     initialInvestigations,
   );
-  const [model, setModel] = useState<ModelName>("graphsage");
+  const model: ModelName = "hybrid";
   const [selected, setSelected] = useState<string | null>(null),
     [pinned, setPinned] = useState<string | null>(null),
     [focus, setFocus] = useState<string | null>(null);
@@ -280,21 +280,7 @@ export default function App() {
     (e) => e.amount_paid != null && e.payment_currency && e.timestamp,
   );
   const availableModels = health.data?.available_models || [];
-  const eligibleModels = availableModels.filter((name) =>
-    ["graphsage", "graph_xgboost"].includes(name),
-  );
-  useEffect(() => {
-    if (
-      mode === "uploaded" &&
-      hasCanonical &&
-      eligibleModels.length &&
-      !eligibleModels.includes(model)
-    ) {
-      setModel(eligibleModels[0] as ModelName);
-      setPinned(null);
-      setContextView(false);
-    }
-  }, [mode, hasCanonical, eligibleModels.join(","), model]);
+  const eligibleModels = availableModels.filter((name) => name === "hybrid");
   const trainedAvailable = hasCanonical && availableModels.includes(model);
   const liveDemo = !!demoStatus.data?.live_available;
   const pendingBatches = activeBatchIds.length > 0 && batches.isPending;
@@ -329,7 +315,7 @@ export default function App() {
           example?.focus_edge_ids || [demoQuery.data.focus_edge_id],
         );
         if (
-          response.run_id !== demoQuery.data.run_id ||
+          response.run_id !== demoQuery.data.hybrid_run_id ||
           response.scores?.length !== targets.size ||
           response.scores.some((score) => !targets.has(score.transaction_id))
         )
@@ -459,7 +445,7 @@ export default function App() {
       ? "Review source evidence"
       : mode === "uploaded" && !trainedAvailable
         ? "Run pattern checks"
-        : `Run ${modelNames[model]}`;
+        : "Analyze network";
   const loadingGraph =
     mode === "demo"
       ? demoQuery.isPending
@@ -632,21 +618,23 @@ export default function App() {
                 <div>
                   <h2>GraphSAGE learns from the neighborhood.</h2>
                   <p>
-                    The graph neural network combines transaction inputs with
-                    historical incoming and outgoing context. Select a
-                    prediction to see the actual prior transfers sampled by its
-                    two layers. Context membership is not a causal explanation.
+                    The graph neural network encodes historical incoming and
+                    outgoing context. Its sender and receiver embeddings feed
+                    XGBoost alongside the transaction fields. Select a
+                    prediction to inspect its actual sampled history.
                   </p>
                 </div>
               </section>
               <section>
                 <GitBranch size={27} />
                 <div>
-                  <h2>The tree model shows its work.</h2>
+                  <h2>XGBoost makes the final decision.</h2>
                   <p>
-                    Graph XGBoost uses a decision-tree ensemble. Inspect real
-                    feature contributions and branch paths. Margins are raw
-                    model outputs, not calibrated confidence percentages.
+                    One hybrid pipeline produces one score. Inspect how
+                    GraphSAGE-derived features and transaction fields contribute
+                    to that score, then follow the actual tree branches. These
+                    attributions are not causal evidence or confidence
+                    percentages.
                   </p>
                 </div>
               </section>
@@ -667,7 +655,7 @@ export default function App() {
                   The bundled graph model demonstration uses generated teaching
                   data and recalculates model predictions on each run. It is not
                   a real investigation or a real-world accuracy benchmark.
-                  Compatible model artifacts and ML dependencies must be
+                  Compatible hybrid artifacts and inference dependencies must be
                   installed on the API.
                 </p>
               </div>
@@ -770,43 +758,13 @@ export default function App() {
                     (!hasCanonical || !eligibleModels.length) ? (
                     <strong>Pattern checks</strong>
                   ) : (
-                    <select
-                      aria-label="Analysis model"
-                      value={model}
-                      disabled={isAnalyzing}
-                      onChange={(e) => {
-                        setModel(e.target.value as ModelName);
-                        setPinned(null);
-                        setContextView(false);
-                      }}
-                    >
-                      <option
-                        value="graphsage"
-                        disabled={
-                          mode === "uploaded" &&
-                          !eligibleModels.includes("graphsage")
-                        }
-                      >
-                        GraphSAGE
-                      </option>
-                      <option
-                        value="graph_xgboost"
-                        disabled={
-                          mode === "uploaded" &&
-                          !eligibleModels.includes("graph_xgboost")
-                        }
-                      >
-                        Graph XGBoost
-                      </option>
-                    </select>
+                    <strong>GraphSAGE → XGBoost</strong>
                   )}
                   <span className="method-description">
                     {mode === "historical"
                       ? "Citations, not model predictions"
                       : mode === "demo"
-                        ? model === "graphsage"
-                          ? "2-layer graph neural network"
-                          : "Decision-tree ensemble"
+                        ? "One hybrid decision · credit for each stage"
                         : trainedAvailable
                           ? "Trained model available"
                           : "For partial or unscored records"}

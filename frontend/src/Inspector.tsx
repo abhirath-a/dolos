@@ -79,6 +79,9 @@ export default function Inspector({
     (s) => s.transaction_id === pinned,
   );
   const explanation = prediction?.explanation;
+  const componentCredits =
+    prediction?.component_contributions || explanation?.component_contributions;
+  const baseMargin = prediction?.base_margin ?? explanation?.base_margin;
   const contexts = explanation?.context_transactions || [];
   const finding = analysis?.findings.find((f) => f.edge_id === selected);
   const [visibleFindings, setVisibleFindings] = useState(10);
@@ -152,7 +155,7 @@ export default function Inspector({
                 <h2>
                   {mode === "historical"
                     ? "Reviewing source evidence"
-                    : "Running the model"}
+                    : "Running the hybrid"}
                 </h2>
                 <p>
                   Waiting for the server’s analysis. Results appear when the
@@ -163,17 +166,17 @@ export default function Inspector({
               <div className="analysis-intro">
                 <h2>
                   {mode === "demo"
-                    ? "See the model’s context."
+                    ? "Inspect the hybrid decision."
                     : mode === "historical"
                       ? "Inspect the source evidence."
                       : "Analyze your statements."}
                 </h2>
                 <p>
                   {mode === "demo"
-                    ? "Analyze the network, then select a transfer to inspect the historical neighbors GraphSAGE sampled."
+                    ? "Analyze once, then inspect the GraphSAGE neighborhood, XGBoost tree paths, and each input group’s credit for the final decision."
                     : mode === "historical"
                       ? "This is a reconstruction from public sources. Evidence review highlights cited relationships; it does not run an ML model on historical claims."
-                      : "When processing finishes, analyze the network. Complete records support trained models; partial records use pattern checks."}
+                      : "When processing finishes, analyze the network. Complete records support the hybrid pipeline; partial records use pattern checks."}
                 </p>
               </div>
             ) : (
@@ -221,7 +224,7 @@ export default function Inspector({
                     <Route edge={pinEdge} graph={graph} />
                     <div className="margin-readout">
                       <div>
-                        <span>Raw model margin</span>
+                        <span>Final decision margin</span>
                         <strong>
                           {prediction.score > 0 ? "+" : ""}
                           {prediction.score.toFixed(3)}
@@ -251,7 +254,56 @@ export default function Inspector({
                     )}
                   </section>
                 )}
-                {explanation?.kind === "graph_context" && (
+                {analysis.model.name === "hybrid" &&
+                  prediction &&
+                  componentCredits && (
+                    <section className="explanation-section hybrid-credit">
+                      <div className="explanation-heading">
+                        <GitBranch size={18} />
+                        <h3>Credit for this finding</h3>
+                      </div>
+                      <p>
+                        <strong>GraphSAGE:</strong> neighborhood encoder.{" "}
+                        <strong>XGBoost:</strong> final classifier and TreeSHAP
+                        attribution. Signed credits group the final tree model’s
+                        inputs; they are not separate model votes.
+                      </p>
+                      <dl className="evidence-facts">
+                        <div>
+                          <dt>Base margin</dt>
+                          <dd>{baseMargin?.toFixed(3)}</dd>
+                        </div>
+                        {componentCredits.map((component) => (
+                          <div key={component.name}>
+                            <dt>{component.name}</dt>
+                            <dd>
+                              {component.contribution >= 0 ? "+" : ""}
+                              {component.contribution.toFixed(3)}
+                            </dd>
+                          </div>
+                        ))}
+                        <div>
+                          <dt>Final decision</dt>
+                          <dd>{prediction?.score.toFixed(3)}</dd>
+                        </div>
+                      </dl>
+                      <p className="interpretation">
+                        Base margin + both component credits = final margin,
+                        before rounding. Credits describe this model decision,
+                        not criminal responsibility or which historical edge
+                        caused it.
+                      </p>
+                      {!explanation && (
+                        <p className="method-disclosure">
+                          Component credits are available for every score;
+                          detailed context and tree paths are included for the
+                          ten highest-ranked transfers.
+                        </p>
+                      )}
+                    </section>
+                  )}
+                {(explanation?.kind === "graph_context" ||
+                  explanation?.kind === "hybrid") && (
                   <section className="explanation-section">
                     <div className="explanation-heading">
                       <Network size={18} />
@@ -342,7 +394,8 @@ export default function Inspector({
                     </div>
                   </section>
                 )}
-                {explanation?.kind === "tree_shap" && (
+                {(explanation?.kind === "tree_shap" ||
+                  explanation?.kind === "hybrid") && (
                   <section className="explanation-section">
                     <div className="explanation-heading">
                       <GitBranch size={18} />
@@ -427,6 +480,7 @@ export default function Inspector({
                   </section>
                 )}
                 {!explanation &&
+                  analysis.model.name !== "hybrid" &&
                   analysis.model.status === "completed" &&
                   (analysis.model.scores?.length || 0) > 1 && (
                     <p className="method-disclosure">

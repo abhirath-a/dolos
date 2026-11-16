@@ -21,3 +21,5 @@ frontend/dist/
 .direnv/
 .impeccable/
 output/
+
+.DS_Store

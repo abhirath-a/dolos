@@ -31,7 +31,7 @@ class AnalysisRequest(BaseModel):
     batch_ids: List[str] = Field(default_factory=list, max_length=1000)
     case_id: Optional[str] = None
     edge_ids: List[str] = Field(default_factory=list, max_length=2000)
-    model: Literal['graph_xgboost', 'transaction_xgboost', 'graphsage'] = 'graph_xgboost'
+    model: Literal['hybrid', 'graph_xgboost', 'transaction_xgboost', 'graphsage'] = 'hybrid'
 
 
 class UploadSpec(BaseModel):
@@ -97,11 +97,16 @@ def create_app(data_dir=None):
         with store.connect() as db:
             queued = db.execute("SELECT COUNT(*) FROM documents WHERE status IN ('queued','processing')").fetchone()[0]
         directory = Path(os.environ.get('DOLOS_MODEL_DIR', ''))
-        available = [name for name, suffix in [('graphsage', '.npz'), ('graph_xgboost', '.json')]
+        components = [name for name, suffix in [('graphsage', '.npz'), ('graph_xgboost', '.json')]
                      if os.environ.get('DOLOS_MODEL_DIR') and (directory / 'manifest.json').is_file()
                      and (directory / (name + suffix)).is_file()]
+        available = []
+        if os.environ.get('DOLOS_MODEL_DIR') and all((directory / name).is_file() for name in
+                ('manifest.json', 'graphsage.npz', 'hybrid_xgboost.json', 'hybrid_manifest.json')):
+            available.append('hybrid')
         return {'status': 'ok', 'pending_documents': queued,
-                'model_configured': bool(available), 'available_models': available}
+                'model_configured': bool(available), 'available_models': available,
+                'component_artifacts': components}
 
     @app.get('/demo/model/status')
     def model_demo_status():
@@ -114,7 +119,7 @@ def create_app(data_dir=None):
                 'data_type': 'synthetic_teaching_data'}
 
     @app.post('/demo/model/analyze')
-    def model_demo_analyze(model: Literal['graphsage', 'graph_xgboost'] = 'graphsage',
+    def model_demo_analyze(model: Literal['hybrid', 'graphsage', 'graph_xgboost'] = 'hybrid',
                            example: Optional[str] = Query(None, max_length=80)):
         from .model_demo import analyze_demo
         try:
@@ -375,6 +380,12 @@ def create_app(data_dir=None):
                                    target_ids=candidates, explain=True)
                 result['model'] = dict(prediction, status='completed', name=request.model,
                     threshold=0, decision_policy='Raw margin above zero is the classifier positive decision; not a calibrated probability.')
+                if request.model == 'hybrid' and prediction['scores']:
+                    # One final model decision. Heuristic rules must not silently
+                    # turn a hybrid-negative transfer into a model finding.
+                    result['pattern_observations'] = result['findings']
+                    result['findings'] = []
+                    result['method'] = 'hybrid_model'
                 existing = {item['edge_id']: item for item in result['findings']}
                 edge_map = {edge['id']: edge for edge in graph['edges']}
                 for item in prediction['scores']:
@@ -404,7 +415,7 @@ def create_app(data_dir=None):
 
     @app.get('/scores')
     def scores(limit: int = Query(100, ge=1, le=1000),
-               model: Literal['graph_xgboost', 'transaction_xgboost', 'graphsage', 'graphsage_no_neighbors'] = 'graph_xgboost'):
+               model: Literal['hybrid', 'graph_xgboost', 'transaction_xgboost', 'graphsage', 'graphsage_no_neighbors'] = 'hybrid'):
         rows = store.transactions(MAX_HISTORY + 1)
         if len(rows) > MAX_HISTORY:
             raise HTTPException(413, 'Scoring exceeds the 100,000-row in-memory history limit. Offline scoring is required.')

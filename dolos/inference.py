@@ -10,6 +10,9 @@ class ModelUnavailable(RuntimeError):
 def score(rows, directory, model_name, limit, target_ids=None, explain=False):
     if not directory or not (Path(directory) / 'manifest.json').is_file():
         raise ModelUnavailable('No trained artifact configured. Run dolos-train and set DOLOS_MODEL_DIR.')
+    if model_name == 'hybrid':
+        from .hybrid import score_hybrid
+        return score_hybrid(rows, directory, limit, target_ids=target_ids, explain=explain)
     try:
         import numpy as np
         from .features import Transactions, History, SnapshotFeatures, CATEGORICAL

@@ -1,4 +1,4 @@
-"""Exercise the video PDFs through upload, worker, graph and both trained models.
+"""Exercise the video PDFs through upload, worker, graph and the hybrid pipeline.
 
 Run: uv run --extra ml --extra test python tools/verify_mock_statements.py
 Uses an isolated local database/storage; never connects to deployed resources.
@@ -47,7 +47,7 @@ def main():
                       'documents': len(batch['documents']), 'accepted': manifest['rows'],
                       'graph_nodes': len(graph['nodes']), 'graph_edges': len(graph['edges']),
                       'video_window_after_utc': after, 'visible_edges': len(visible['edges']), 'models': {}}
-            for model in ('graphsage', 'graph_xgboost'):
+            for model in ('hybrid',):
                 full = client.post('/analyze', json={'batch_ids': [batch_id], 'model': model})
                 assert full.status_code == 200, full.text
                 full_prediction = full.json()['model']
@@ -71,6 +71,8 @@ def main():
                                 'source': by_id[item['transaction_id']]['source'],
                                 'target': by_id[item['transaction_id']]['target'],
                                 'raw_margin': item['score'],
+                                'base_margin': item.get('base_margin'),
+                                'component_contributions': item.get('component_contributions'),
                                 'explanation': (item.get('explanation') or {}).get('kind')}
                                for item in prediction['scores']]}
             (pack / 'validation.json').write_text(json.dumps(report, indent=2) + '\n')

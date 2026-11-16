@@ -29,9 +29,8 @@ def _mean_neighbors(values, edges, count):
     return sums / divisor[:, None]
 
 
-def _score(features, rows, weights, neighbors):
+def _encode(features, rows, weights, neighbors):
     roots, endpoints = features.roots(rows)
-    attrs = features.data.edge_features(rows)
     if neighbors:
         middle, inner = features.block(roots, FANOUTS[0])
         outer_keys, outer = features.block(middle, FANOUTS[1])
@@ -50,10 +49,36 @@ def _score(features, rows, weights, neighbors):
         values = features.nodes(roots)
         for layer in range(2):
             values = np.maximum(_linear(values, weights, f'root.{layer}'), 0)
-    joined = np.concatenate((values[endpoints].reshape(len(rows), -1), attrs), axis=1)
+    return values[endpoints].reshape(len(rows), -1)
+
+
+def _score(features, rows, weights, neighbors):
+    joined = np.concatenate((_encode(features, rows, weights, neighbors), features.data.edge_features(rows)), axis=1)
     hidden = np.maximum(_linear(joined, weights, 'head.0'), 0)
     # PyTorch's head.2 is dropout, disabled in evaluation mode.
     return _linear(hidden, weights, 'head.3').reshape(-1)
+
+
+def _weights(weight_path):
+    with np.load(Path(weight_path), allow_pickle=False) as archive:
+        weights = {key: archive[key] for key in archive.files}
+    if any(array.dtype != np.float32 or not np.isfinite(array).all()
+           for array in weights.values()):
+        raise ValueError('Expected finite float32 GraphSAGE tensors.')
+    return weights
+
+
+def encode_numpy(features, target, weight_path, neighbors=True, batch_size=384):
+    """Encode sender/receiver to 128 trained GraphSAGE features, without its head."""
+    if batch_size < 1:
+        raise ValueError('GraphSAGE batch size must be positive.')
+    if not len(target):
+        return np.empty((0, 128), dtype=np.float32)
+    weights = _weights(weight_path)
+    return np.concatenate([
+        _encode(features, target[start:start + batch_size], weights, neighbors)
+        for start in range(0, len(target), batch_size)
+    ])
 
 
 def predict_numpy(features, target, weight_path, neighbors=True, batch_size=384):
@@ -62,11 +87,7 @@ def predict_numpy(features, target, weight_path, neighbors=True, batch_size=384)
         raise ValueError('GraphSAGE batch size must be positive.')
     if not len(target):
         return np.empty(0, dtype=np.float32)
-    with np.load(Path(weight_path), allow_pickle=False) as archive:
-        weights = {key: archive[key] for key in archive.files}
-    if any(array.dtype != np.float32 or not np.isfinite(array).all()
-           for array in weights.values()):
-        raise ValueError('Expected finite float32 GraphSAGE tensors.')
+    weights = _weights(weight_path)
     return np.concatenate([
         _score(features, target[start:start + batch_size], weights, neighbors)
         for start in range(0, len(target), batch_size)

@@ -1,0 +1,30 @@
+{
+  "feature_version": "sage-embedding-xgb-v1",
+  "run_id": "314fb67b8e4c-hourly-v1-2880-e8-hybrid-v1",
+  "base_run_id": "314fb67b8e4c-hourly-v1-2880-e8",
+  "source_sha256": "314fb67b8e4ce8e16c3873f61e1978ee9a5383945382cd2fd9ff81d276ceedfb",
+  "encoder_sha256": "a3b9431c27f1cc18703b7b487fdcb438502ff3ff692541e97d3c5cf9e399763f",
+  "tree_sha256": "3a3701dfa9e5b459c4c01d27feb782d998b1cedfc3d8249f54da957f7f179d86",
+  "training_cutoff_us": 1736726400000000,
+  "selection_cutoff_us": 1736856000000000,
+  "source_rows": 2880,
+  "training_rows": 2016,
+  "held_out_rows": 432,
+  "feature_count": 136,
+  "graph_embedding_features": 128,
+  "transaction_features": 8,
+  "architecture": "Frozen directed GraphSAGE sender/receiver embeddings plus transaction fields -> one XGBoost classifier",
+  "training_policy": "Frozen encoder trained before training cutoff and checkpoint selected on chronological validation. Final XGBoost trained only on pre-training-cutoff rows with fixed hyperparameters; held-out labels used only for this reported evaluation.",
+  "parameters": {
+    "n_estimators": 150,
+    "max_depth": 5,
+    "learning_rate": 0.08,
+    "random_state": 7
+  },
+  "held_out_evaluation": {
+    "average_precision": 1.0,
+    "positive_decisions": 144,
+    "positive_labels": 144,
+    "note": "Same synthetic generator as training; not independent real-world validation."
+  }
+}

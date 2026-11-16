@@ -112,6 +112,7 @@ export interface Explanation {
   }[];
   base_margin?: number;
   contribution_sum?: number;
+  component_contributions?: { name: string; contribution: number }[];
   features?: { name: string; value: number; contribution: number }[];
   context_transaction_ids?: string[];
   cutoff_us?: number;
@@ -139,6 +140,9 @@ export interface Analysis {
     scores?: {
       transaction_id: string;
       score: number;
+      base_margin?: number;
+      contribution_sum?: number;
+      component_contributions?: { name: string; contribution: number }[];
       explanation?: Explanation;
     }[];
   };
@@ -191,6 +195,7 @@ export interface ModelDemo {
   source_rows: number;
   source_sha256: string;
   run_id: string;
+  hybrid_run_id?: string;
   generated_at: string;
   focus_edge_id: string;
   graph: Graph;
@@ -205,4 +210,4 @@ export interface Investigation {
   batchIds: string[];
   createdAt: string;
 }
-export type ModelName = "graphsage" | "graph_xgboost";
+export type ModelName = "hybrid";

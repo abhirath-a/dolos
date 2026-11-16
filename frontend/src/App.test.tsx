@@ -24,7 +24,7 @@ describe("graph-first entry", () => {
     );
     expect(html).toContain("The pass-through network");
     expect(html).toContain("Synthetic teaching data");
-    expect(html).toContain("Run GraphSAGE");
+    expect(html).toContain("Analyze network");
     expect(html).not.toContain("View recorded run");
     expect(html).not.toContain('value="case:1mdb"');
     expect(html).toContain("Export visible");

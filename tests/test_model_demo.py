@@ -92,7 +92,7 @@ def test_live_scores_do_not_import_training_stack_and_recalculate_weights(tmp_pa
     monkeypatch.setattr(builtins, '__import__', serving_only)
     for name in ('graphsage', 'graph_xgboost'):
         assert analyze_demo(name)['scores'][0]['explanation']
-    for filename in ('manifest.json', 'graph_xgboost.json'):
+    for filename in ('manifest.json', 'graph_xgboost.json', 'hybrid_xgboost.json', 'hybrid_manifest.json'):
         shutil.copyfile(artifacts / filename, tmp_path / filename)
     with np.load(artifacts / 'graphsage.npz', allow_pickle=False) as original:
         weights = {name: original[name] for name in original.files}

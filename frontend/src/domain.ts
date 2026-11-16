@@ -125,6 +125,7 @@ export function pageRange<T>(rows: T[], page: number, size = 10) {
   };
 }
 export const modelNames: Record<string, string> = {
+  hybrid: "Dolos hybrid",
   graphsage: "GraphSAGE",
   graph_xgboost: "Graph XGBoost",
   transaction_xgboost: "Transaction XGBoost",
