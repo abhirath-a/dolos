@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "dolos/api.py": {
+      "excludeFiles": "{frontend/**,tests/**,docs/**,output/**,tools/**,work/**,var/**,artifacts/**,flowgraph_notebook_run/**,.venv/**,.direnv/**,**/*.ipynb}"
+    }
+  }
+}

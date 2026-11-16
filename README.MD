@@ -28,7 +28,7 @@ Our project was trained with the IBM Transactions for Anti Money Laundering with
 
 A FastAPI service built from `dolos.ipynb`, with durable batch ingestion, a separate worker, and a directed transaction multigraph. The API runs without the large ML dependencies. The notebook remains available; `dolos/model.py` extracts its feature construction, models, metrics, and training pipeline without running notebook cells at import.
 
-Turso (`libsql`) and R2 (`boto3`) drivers are base runtime dependencies so Vercel's default Python installation includes them. The `turso` and `r2` extras remain compatible with existing commands. If a previous deployment reports `No module named 'libsql'`, deploy the updated `pyproject.toml` and `uv.lock` together and rebuild without the previous build cache. PDF extraction and ML dependencies remain optional.
+Turso (`libsql`), R2 (`boto3`), and inference dependencies (`numpy` and native XGBoost) are base runtime dependencies so Vercel's default Python installation includes them. Linux x86-64 uses the small `xgboost-cpu` wheel. GraphSAGE evaluates exported `.npz` tensors with NumPy using the same shared history features as training; PyTorch, PyG, Polars and scikit-learn are only needed for training via the optional `ml` extra. The `turso` and `r2` extras remain compatible with existing commands. Deploy `pyproject.toml`, `uv.lock`, source and packaged artifacts together; reset the Vercel API install override to its default and rebuild without the previous cache. PDF extraction remains optional on the API and is installed on the worker.
 
 ## React frontend
 
@@ -48,7 +48,7 @@ uv run python -m dolos.worker
 
 Open http://localhost:5173. Build with `pnpm build`, then serve frontend and API together using `uv run uvicorn dolos.web:app` at port 8000. The original `dolos.api:app` API remains available unchanged.
 
-The bundled demo uses explicitly labeled synthetic teaching data, not IBM data or real bank statements. Analyze always recomputes GraphSAGE or Graph XGBoost on the server; recorded predictions are never substituted on failure. Matching source data, manifests and trained weights are shipped under `dolos/demo_assets/`. Install the ML extra for live inference. To regenerate the source, frontend fixture and packaged weights together, run `uv run --extra ml python -m dolos.model_demo`. Uploaded canonical transactions use separate configured `DOLOS_MODEL_DIR` artifacts. For the generated synthetic upload pack only, point it to `dolos/demo_assets/artifacts`; this teaching model does not establish real-world accuracy. See [the video runbook](docs/video-demo.md).
+The bundled demo uses explicitly labeled synthetic teaching data, not IBM data or real bank statements. Analyze always recomputes GraphSAGE or Graph XGBoost on the server; recorded predictions are never substituted on failure. Matching source data, manifests and trained weights are shipped under `dolos/demo_assets/`. Default runtime dependencies enable live inference without the training extra. To regenerate the source, frontend fixture and packaged weights together, run `uv run --extra ml python -m dolos.model_demo`. Uploaded canonical transactions use separate configured `DOLOS_MODEL_DIR` artifacts. For the generated synthetic upload pack only, point it to `dolos/demo_assets/artifacts`; this teaching model does not establish real-world accuracy. See [the video runbook](docs/video-demo.md).
 
 `POST /analyze` accepts a historical `case_id` or uploaded `batch_ids`, visible `edge_ids`, and a model. `/graph` supports inclusive `after` and exclusive `before` date windows. Historical evidence review, partial-PDF pattern checks, and actual trained-model inference remain distinct. Export and the ledger disclose their visible scope.
 
@@ -238,7 +238,7 @@ Read `/demo/cases` for case cards and sourced metrics, `/demo/cases/1mdb` for on
 
 ## Train and serve the notebook models
 
-No trained weights are included in the repository. Saved notebook benchmark numbers are not a model. Install ML dependencies, obtain the IBM training dataset, and export a fresh artifact directory:
+Only synthetic teaching-model weights are included in the repository. For a separately trained model, install training dependencies, obtain the IBM training dataset, and export a fresh artifact directory:
 
 ```sh
 uv sync --extra ml

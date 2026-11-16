@@ -97,7 +97,7 @@ def create_app(data_dir=None):
         with store.connect() as db:
             queued = db.execute("SELECT COUNT(*) FROM documents WHERE status IN ('queued','processing')").fetchone()[0]
         directory = Path(os.environ.get('DOLOS_MODEL_DIR', ''))
-        available = [name for name, suffix in [('graphsage', '.pt'), ('graph_xgboost', '.json')]
+        available = [name for name, suffix in [('graphsage', '.npz'), ('graph_xgboost', '.json')]
                      if os.environ.get('DOLOS_MODEL_DIR') and (directory / 'manifest.json').is_file()
                      and (directory / (name + suffix)).is_file()]
         return {'status': 'ok', 'pending_documents': queued,
@@ -108,9 +108,9 @@ def create_app(data_dir=None):
         from importlib.util import find_spec
         from .model_demo import demo_paths
         data, directory, source = demo_paths()
-        missing = [name for name in ('numpy', 'polars', 'torch', 'torch_geometric', 'sklearn', 'xgboost') if find_spec(name) is None]
+        missing = [name for name in ('numpy', 'xgboost') if find_spec(name) is None]
         return {'live_available': bool(directory) and not missing, 'recorded_available': bool(data),
-                'reason': 'Install dolos[ml]; missing: ' + ', '.join(missing) if missing else None,
+                'reason': 'Reinstall base runtime dependencies; missing: ' + ', '.join(missing) if missing else None,
                 'data_type': 'synthetic_teaching_data'}
 
     @app.post('/demo/model/analyze')

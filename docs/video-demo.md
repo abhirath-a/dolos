@@ -8,7 +8,7 @@ Analyze recomputes the selected model on the server. It never replaces an unavai
 
 ## Deploy
 
-Deploy the updated frontend, Vercel API and Railway worker. The API must have the `ml` extra installed and its package must fit the configured Vercel runtime. Packaging the small weights does not install PyTorch or remove Vercel bundle/memory limits. That hosted build remains to be verified.
+Deploy the updated frontend, Vercel API and Railway worker. The API's base dependencies now include NumPy and native XGBoost (the CPU-only wheel on Linux x86-64). GraphSAGE evaluates the exported trained `.npz` tensors with NumPy; PyTorch and the `ml` training extra are not required for serving. Reset Vercel's API install-command override to its default and rebuild without cache. A Linux x86-64 dependency installation measured approximately 245 MiB before application files, below the standard 500 MB function limit; the actual hosted build remains to be verified.
 
 For synthetic statement uploads, set this on the API:
 
@@ -52,7 +52,7 @@ Ordinary bank PDFs without that attachment retain the flexible provider extracti
 ```sh
 nix develop
 uv run --with reportlab --extra pdf-llm python tools/generate_mock_statements.py
-uv run --extra ml --extra test python tools/verify_mock_statements.py
+uv run --extra test python tools/verify_mock_statements.py
 ```
 
 The second command rebuilds the validation report and public ZIP. To regenerate the trained synthetic model and its matching source, use `uv run --extra ml python -m dolos.model_demo` first, then recreate/revalidate the statement pack.

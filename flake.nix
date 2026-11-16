@@ -10,6 +10,10 @@
           in {
             default = pkgs.mkShell {
               packages = [ pkgs.nodejs_26 pkgs.pnpm pkgs.uv ];
+              # The macOS XGBoost wheel needs OpenMP; Linux CPU wheels bundle it.
+              shellHook = pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
+                export DYLD_LIBRARY_PATH="${pkgs.llvmPackages.openmp}/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+              '';
             };
           });
     };

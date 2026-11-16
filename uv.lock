@@ -805,12 +805,15 @@ dependencies = [
     { name = "fastapi", version = "0.162.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "fastapi", version = "0.163.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "libsql" },
+    { name = "numpy" },
     { name = "pypdf" },
     { name = "python-multipart", version = "0.0.20", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "python-multipart", version = "0.0.32", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "python-multipart", version = "0.0.33", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "uvicorn", version = "0.39.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "uvicorn", version = "0.54.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "xgboost", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
+    { name = "xgboost-cpu", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 
 [package.optional-dependencies]
@@ -820,7 +823,6 @@ ml = [
     { name = "scikit-learn" },
     { name = "torch" },
     { name = "torch-geometric" },
-    { name = "xgboost" },
 ]
 pdf-llm = [
     { name = "openai", version = "2.48.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -849,6 +851,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27,<1" },
     { name = "libsql", specifier = ">=0.1,<1" },
     { name = "libsql", marker = "extra == 'turso'", specifier = ">=0.1,<1" },
+    { name = "numpy", specifier = "==2.0.2" },
     { name = "numpy", marker = "extra == 'ml'", specifier = "==2.0.2" },
     { name = "openai", marker = "extra == 'pdf-llm'", specifier = ">=1.68,<3" },
     { name = "pillow", marker = "extra == 'pdf-llm'", specifier = ">=10,<13" },
@@ -861,7 +864,8 @@ requires-dist = [
     { name = "torch", marker = "extra == 'ml'", specifier = "==2.8.0" },
     { name = "torch-geometric", marker = "extra == 'ml'", specifier = "==2.6.1" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
-    { name = "xgboost", marker = "extra == 'ml'", specifier = "==2.1.4" },
+    { name = "xgboost", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==2.1.4" },
+    { name = "xgboost-cpu", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==2.1.4" },
 ]
 provides-extras = ["r2", "turso", "pdf-llm", "ml", "test"]
 
@@ -4453,6 +4457,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b1/53/37032dca20dae7a88ad1907f817a81f232ca6e935f0c28c98db3c0a0bd22/xgboost-2.1.4-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:d366097d0db047315736f46af852feaa907f6d7371716af741cdce488ae36d20", size = 4206715, upload-time = "2025-02-06T18:17:08.448Z" },
     { url = "https://files.pythonhosted.org/packages/e4/3c/e3a93bfa7e8693c825df5ec02a40f7ff5f0950e02198b1e85da9315a8d47/xgboost-2.1.4-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:8df6da72963969ab2bf49a520c3e147b1e15cbeddd3aa0e3e039b3532c739339", size = 223642416, upload-time = "2025-02-06T18:17:25.08Z" },
     { url = "https://files.pythonhosted.org/packages/43/80/0b5a2dfcf5b4da27b0b68d2833f05d77e1a374d43db951fca200a1f12a52/xgboost-2.1.4-py3-none-win_amd64.whl", hash = "sha256:8bbfe4fedc151b83a52edbf0de945fd94358b09a81998f2945ad330fd5f20cd6", size = 124910381, upload-time = "2025-02-06T18:17:43.202Z" },
+]
+
+[[package]]
+name = "xgboost-cpu"
+version = "2.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/57/479d1d82bf6d40e323de8576062016819b525bc5e3376e6ee6f160398331/xgboost_cpu-2.1.4-py3-none-manylinux2014_x86_64.whl", hash = "sha256:ac3281127b2f77f6c62e8699216b0974a1c4a442ee6162eb94256c01df7cd1f5", size = 4533116, upload-time = "2025-02-06T18:17:53.134Z" },
 ]
 
 [[package]]

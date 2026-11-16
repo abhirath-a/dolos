@@ -12,9 +12,9 @@ def score(rows, directory, model_name, limit, target_ids=None, explain=False):
         raise ModelUnavailable('No trained artifact configured. Run dolos-train and set DOLOS_MODEL_DIR.')
     try:
         import numpy as np
-        from .model import Transactions, History, SnapshotFeatures, DirectedSAGE, predict, CATEGORICAL
+        from .features import Transactions, History, SnapshotFeatures, CATEGORICAL
     except ImportError as exc:
-        raise ModelUnavailable('Install dolos[ml] to enable model inference.') from exc
+        raise ModelUnavailable('Inference runtime is missing. Reinstall the base dolos dependencies and redeploy.') from exc
     directory = Path(directory)
     manifest = json.loads((directory / 'manifest.json').read_text())
     if manifest.get('feature_version') != 'hourly-v1' or 'vocabularies' not in manifest:
@@ -48,21 +48,20 @@ def score(rows, directory, model_name, limit, target_ids=None, explain=False):
     features = SnapshotFeatures(data)
     explanations = {}
     if model_name in ('graph_xgboost', 'transaction_xgboost'):
-        from xgboost import XGBClassifier
-        model = XGBClassifier()
+        from xgboost import Booster, DMatrix
+        model = Booster(params={'nthread': 1})
         artifact = directory / (model_name + '.json')
         if not artifact.is_file():
             raise ModelUnavailable(f'Missing {model_name} artifact.')
-        model.load_model(artifact)
+        model.load_model(str(artifact))
         inputs = data.edge_features(target)
         if model_name == 'graph_xgboost':
             roots, endpoints = features.roots(target)
             inputs = np.column_stack((inputs, features.nodes(roots)[endpoints].reshape(len(target), -1)))
-        values = model.predict(inputs, output_margin=True)
+        values = model.predict(DMatrix(inputs, nthread=1), output_margin=True)
         if explain:
-            from xgboost import DMatrix
             ranked = np.argsort(-values)[:10]
-            contributions = model.get_booster().predict(DMatrix(inputs[ranked]), pred_contribs=True)
+            contributions = model.predict(DMatrix(inputs[ranked], nthread=1), pred_contribs=True)
             names = ['Log received amount', 'Log paid amount']
             for category in CATEGORICAL:
                 names.extend([category.replace('_', ' ') + ': ' + label for label in ['unknown'] + vocab[category]])
@@ -81,19 +80,29 @@ def score(rows, directory, model_name, limit, target_ids=None, explain=False):
                 top = np.argsort(-np.abs(contrib[:-1]))[:8]
                 explanations[rows[target[position]]['id']] = {'kind': 'tree_shap',
                     'base_margin': float(contrib[-1]), 'contribution_sum': float(contrib[:-1].sum()),
-                    'tree_count': len(model.get_booster().get_dump()),
-                    'tree_paths': tree_paths(model.get_booster(), inputs[position], names),
+                    'tree_count': len(model.get_dump()),
+                    'tree_paths': tree_paths(model, inputs[position], names),
                     'features': [{'name': names[j], 'value': float(inputs[position, j]), 'contribution': float(contrib[j])} for j in top],
                     'note': 'TreeSHAP contributions add to the raw margin with the base value. Top eight shown; omitted features still contribute. Values are transformed model inputs, not raw statement amounts. These are model attributions, not causal evidence.'}
     else:
-        import torch
-        artifact = directory / (model_name + '.pt')
-        if not artifact.is_file():
-            raise ModelUnavailable(f'Missing {model_name} artifact.')
-        model = DirectedSAGE(features.node_dim, data.edge_features(target[:1]).shape[1],
-                             neighbors=model_name == 'graphsage')
-        model.load_state_dict(torch.load(artifact, map_location='cpu', weights_only=True))
-        values = predict(model, features, target, 384)
+        artifact = directory / (model_name + '.npz')
+        if artifact.is_file():
+            from .numpy_sage import predict_numpy
+            values = predict_numpy(features, target, artifact, neighbors=model_name == 'graphsage')
+        else:
+            # Older training runs can still serve in the optional full ML environment.
+            try:
+                import torch
+                from .model import DirectedSAGE, predict
+            except ImportError as exc:
+                raise ModelUnavailable('GraphSAGE needs an exported .npz weight file. Regenerate/export the model offline and redeploy; inference does not require the training extra.') from exc
+            artifact = directory / (model_name + '.pt')
+            if not artifact.is_file():
+                raise ModelUnavailable(f'Missing {model_name} artifact.')
+            model = DirectedSAGE(features.node_dim, data.edge_features(target[:1]).shape[1],
+                                 neighbors=model_name == 'graphsage')
+            model.load_state_dict(torch.load(artifact, map_location='cpu', weights_only=True))
+            values = predict(model, features, target, 384)
         if explain and model_name == 'graphsage':
             for position in np.argsort(-values)[:10]:
                 roots, _ = features.roots(target[position:position+1])

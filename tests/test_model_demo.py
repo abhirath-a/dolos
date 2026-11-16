@@ -42,8 +42,6 @@ def test_demo_live_status_is_explicit_when_artifacts_missing(tmp_path,monkeypatc
 
 def test_packaged_demo_matches_frontend_and_live_predictions(tmp_path, monkeypatch):
     import pytest
-    pytest.importorskip('torch')
-    pytest.importorskip('xgboost')
     monkeypatch.delenv('DOLOS_DEMO_MODEL_DIR', raising=False)
     monkeypatch.delenv('DOLOS_DEMO_SOURCE_CSV', raising=False)
     monkeypatch.delenv('DOLOS_API_KEY', raising=False)
@@ -61,3 +59,34 @@ def test_packaged_demo_matches_frontend_and_live_predictions(tmp_path, monkeypat
         assert result['name'] == name
         assert result['scores'][0]['score'] == pytest.approx(data['models'][name]['scores'][0]['score'], abs=1e-4)
         assert result['scores'][0]['explanation']
+
+
+def test_live_scores_do_not_import_training_stack_and_recalculate_weights(tmp_path, monkeypatch):
+    import builtins
+    import shutil
+    import numpy as np
+    import pytest
+    from dolos.model_demo import analyze_demo, demo_paths
+    monkeypatch.delenv('DOLOS_DEMO_MODEL_DIR', raising=False)
+    _, artifacts, _ = demo_paths()
+    original_import = builtins.__import__
+
+    def serving_only(name, *args, **kwargs):
+        if name.split('.')[0] in {'torch', 'torch_geometric', 'polars', 'sklearn'}:
+            raise ImportError('Training dependency blocked by serving-only test')
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', serving_only)
+    for name in ('graphsage', 'graph_xgboost'):
+        assert analyze_demo(name)['scores'][0]['explanation']
+    for filename in ('manifest.json', 'graph_xgboost.json'):
+        shutil.copyfile(artifacts / filename, tmp_path / filename)
+    with np.load(artifacts / 'graphsage.npz', allow_pickle=False) as original:
+        weights = {name: original[name] for name in original.files}
+    # A copied test artifact changes only the final head. Fresh inference must
+    # evaluate it, rather than returning the recorded fixture's original score.
+    weights['head.3.weight'] = np.zeros_like(weights['head.3.weight'])
+    weights['head.3.bias'] = np.full_like(weights['head.3.bias'], 1.25)
+    np.savez_compressed(tmp_path / 'graphsage.npz', **weights)
+    monkeypatch.setenv('DOLOS_DEMO_MODEL_DIR', str(tmp_path))
+    assert analyze_demo('graphsage')['scores'][0]['score'] == pytest.approx(1.25)

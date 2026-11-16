@@ -105,6 +105,16 @@ def export_runtime_bundle(root, payload, artifacts, source):
     (target / 'artifacts').mkdir(parents=True, exist_ok=True)
     for name in ('manifest.json', 'graphsage.pt', 'graph_xgboost.json'):
         shutil.copyfile(artifacts / name, target / 'artifacts' / name)
+    exported = artifacts / 'graphsage.npz'
+    if exported.is_file():
+        shutil.copyfile(exported, target / 'artifacts' / exported.name)
+    else:
+        # Offline conversion only. Serving reads these exact tensors with NumPy.
+        import numpy as np
+        import torch
+        state = torch.load(artifacts / 'graphsage.pt', map_location='cpu', weights_only=True)
+        np.savez_compressed(target / 'artifacts' / 'graphsage.npz',
+                            **{name: value.detach().cpu().numpy() for name, value in state.items()})
     shutil.copyfile(source, target / 'synthetic-transfers.csv')
     (target / 'model-demo.json').write_text(json.dumps(payload, indent=2) + '\n')
 
@@ -122,7 +132,7 @@ def demo_paths():
     default_directory = package / 'artifacts' if (package / 'artifacts').is_dir() else root / 'var' / 'model-demo' / (data['source_sha256'][:12] + '-e' + str(data.get('epochs', 8)))
     directory = Path(os.environ.get('DOLOS_DEMO_MODEL_DIR', str(default_directory)))
     source = Path(os.environ.get('DOLOS_DEMO_SOURCE_CSV', str(package / 'synthetic-transfers.csv' if package.is_dir() else root / 'var' / 'model-demo' / 'synthetic-transfers.csv')))
-    ready = directory if all((directory / name).is_file() for name in ('manifest.json', 'graphsage.pt', 'graph_xgboost.json')) and source.is_file() else None
+    ready = directory if all((directory / name).is_file() for name in ('manifest.json', 'graphsage.npz', 'graph_xgboost.json')) and source.is_file() else None
     return data, ready, source
 
 
@@ -131,7 +141,7 @@ def analyze_demo(model):
     from .parsers import parse_document
     data, directory, source = demo_paths()
     if not directory:
-        raise ModelUnavailable('Live demonstration artifacts are not installed. Deploy the packaged demo_assets and ML dependencies; no recorded prediction was substituted.')
+        raise ModelUnavailable('Live demonstration artifacts are not installed. Deploy the packaged demo_assets including graphsage.npz; no recorded prediction was substituted.')
     if hashlib.sha256(source.read_bytes()).hexdigest() != data['source_sha256']:
         raise ModelUnavailable('Demo source fingerprint differs from the recorded graph. Regenerate the demo.')
     manifest = json.loads((directory / 'manifest.json').read_text())

@@ -4,6 +4,6 @@ The main example picker now exposes only the synthetic pass-through network, plu
 
 Every example analysis posts to `/api/demo/model/analyze?model=graphsage` or `graph_xgboost`. Repeated clicks recompute server-side; changing models clears the previous selection/result. The frontend no longer substitutes bundled scores if live inference is unavailable. It shows the API error and offers Retry instead. The graph and data provenance still come from `model-demo.json`; the API requires matching live artifacts/source fingerprint.
 
-The deployment must include the ML dependencies and compatible model artifacts. A static frontend build alone does not enable inference. Uploaded partial PDF relationships continue using explicitly labeled pattern checks when model eligibility is absent.
+The deployment must include the base inference dependencies and compatible model artifacts, including GraphSAGE's exported `.npz` tensors. Inference uses shared NumPy features, NumPy evaluation of the trained GraphSAGE weights, and native CPU XGBoost; the optional PyTorch training stack is not required. A static frontend build alone does not enable inference. Uploaded partial PDF relationships continue using explicitly labeled pattern checks when model eligibility is absent.
 
 Checks cover historical selection migration, both live model endpoints, repeated computation, unavailable-live errors, and upload navigation preservation. Rendered browser verification remains outstanding because the browser host is unavailable in this environment.
