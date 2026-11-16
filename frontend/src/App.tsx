@@ -555,6 +555,7 @@ export default function App() {
           onClick={() => choose("demo")}
         >
           <Brand />
+          <span className="brand-slogan">Follow the Money...</span>
         </button>
         <label className="investigation-picker">
           <FolderOpen size={16} />

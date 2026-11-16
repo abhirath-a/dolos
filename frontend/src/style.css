@@ -203,7 +203,7 @@ svg {
   display: flex;
   align-items: center;
   background: #d9e4ff;
-  padding: 0 25px 0 28px;
+  padding:  40px;
   gap: 25px;
 }
 .app-shell {
@@ -214,7 +214,22 @@ svg {
 .brand-button {
   padding: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+.brand-button .brand {
+  line-height: 1;
+}
+.brand-slogan {
+  padding-left: 35px;
+  color: #a52c2c;
+  font-family: "Manrope Variable", sans-serif;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.025em;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .brand {
   font-family: "Manrope Variable", sans-serif;
