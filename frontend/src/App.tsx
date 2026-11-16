@@ -703,7 +703,7 @@ export default function App() {
             <>
               <div className="workspace-heading">
                 <div>
-                  <h1>The anti-money laundering model.</h1>
+                  <h1>The anti-money laundering & unauthorized transactions model of tomorrow.</h1>
                   <div className="workspace-description">
                     <span
                       className={`dataset-tag ${mode === "demo" ? "synthetic" : ""}`}

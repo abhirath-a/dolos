@@ -608,6 +608,9 @@ svg {
 .graph-entity .react-flow__handle-right {
   right: 48px !important;
 }
+.network-canvas .react-flow__edgelabel-renderer {
+  z-index: 20;
+}
 .transfer-label {
   position: absolute;
   pointer-events: none;
@@ -622,6 +625,48 @@ svg {
 .transfer-label.flagged {
   background: #613b32;
   color: #ffd6c8;
+}
+.transfer-label.active {
+  z-index: 21;
+  background: #e4ff45;
+  color: #182208;
+  font-weight: 800;
+  outline: 2px solid #182208;
+}
+.graph-scale-controls {
+  top: 76px !important;
+  left: 18px !important;
+  margin: 0 !important;
+  padding: 10px 12px;
+  border: 1px solid #526171;
+  border-radius: 8px;
+  background: #22303b;
+  color: #edf4fc;
+  font-size: 12px;
+}
+.graph-scale-controls label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.graph-scale-controls input {
+  width: 100px;
+  accent-color: #e4ff45;
+  cursor: pointer;
+}
+.graph-scale-controls output {
+  min-width: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.graph-scale-controls button {
+  color: #edf4fc;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 32px;
+}
+.graph-scale-controls button:hover {
+  color: #e4ff45;
 }
 .react-flow__controls {
   left: 18px !important;
@@ -2717,7 +2762,7 @@ th,
 }
 .investigation-picker select {
   border: 5px solid transparent;
-  border-radius:5px;
+  border-radius: 5px;
   background: transparent;
   color: #3d4f6b;
   font-size: 12px;

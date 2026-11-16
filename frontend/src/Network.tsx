@@ -1,9 +1,10 @@
-import { memo, useMemo, useEffect } from "react";
+import { memo, useMemo, useEffect, useState } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  Panel,
   Handle,
   Position,
   MarkerType,
@@ -126,7 +127,7 @@ function TransferEdge(props: EdgeProps) {
       {props.data?.showLabel && (
         <EdgeLabelRenderer>
           <div
-            className={`transfer-label ${props.data?.flagged ? "flagged" : ""}`}
+            className={`transfer-label ${props.data?.flagged ? "flagged" : ""} ${props.data?.active ? "active" : ""}`}
             style={{
               opacity: props.style?.opacity,
               transform: `translate(-50%,-50%) translate(${midpoint.x}px,${midpoint.y}px)`,
@@ -166,6 +167,8 @@ export default function Network({
   pinned?: string | null;
   contextOnly?: boolean;
 }) {
+  const [xScale, setXScale] = useState(1);
+  const [yScale, setYScale] = useState(1);
   const visible = useMemo(
     () =>
       graphEdgesForView(graph, flags, onlyFlags, context, pinned, contextOnly),
@@ -179,8 +182,8 @@ export default function Network({
     const layout = new dagre.graphlib.Graph({ multigraph: true });
     layout.setGraph({
       rankdir: "LR",
-      nodesep: 90,
-      ranksep: 165,
+      nodesep: 90 * yScale,
+      ranksep: 165 * xScale,
       edgesep: 30,
       marginx: 70,
       marginy: 80,
@@ -209,7 +212,7 @@ export default function Network({
         ]),
       ),
     };
-  }, [graph, visible, onlyFlags, contextOnly]);
+  }, [graph, visible, onlyFlags, contextOnly, xScale, yScale]);
   const { nodes, edges } = useMemo(() => {
     const flaggedNodes = new Set(
       visible
@@ -272,13 +275,15 @@ export default function Network({
           flag = flags.has(e.id),
           hot = e.id === selected || e.id === pinned || flag || incident;
         const color =
-          e.id === pinned || flag
-            ? "#f07860"
-            : isContext
-              ? "#88adff"
-              : e.id === selected || incident
-                ? "#c1d6ed"
-                : "#7c929f";
+          e.id === selected
+            ? "#e4ff45"
+            : e.id === pinned || flag
+              ? "#f07860"
+              : isContext
+                ? "#88adff"
+                : e.id === selected || incident
+                  ? "#c1d6ed"
+                  : "#7c929f";
         return {
           id: e.id,
           source: e.source,
@@ -294,10 +299,12 @@ export default function Network({
             showLabel: hot || visible.length <= 12,
             flagged: flag,
             hot,
+            active: e.id === selected,
           },
           style: {
             stroke: color,
-            strokeWidth: hot ? 2.5 : isContext ? 1.8 : 1.1,
+            strokeWidth:
+              e.id === selected ? 5 : hot ? 2.5 : isContext ? 1.8 : 1.1,
             strokeDasharray: isContext && !hot ? "5 5" : undefined,
             opacity: dimmed ? 0.2 : 1,
           },
@@ -357,6 +364,47 @@ export default function Network({
       colorMode="dark"
       proOptions={{ hideAttribution: true }}
     >
+      <Panel
+        position="top-left"
+        className="graph-scale-controls nodrag nopan"
+        aria-label="Graph spacing"
+      >
+        <label>
+          X scale{" "}
+          <input
+            aria-label="Horizontal graph scale"
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.1"
+            value={xScale}
+            onChange={(event) => setXScale(Number(event.target.value))}
+          />
+          <output>{xScale.toFixed(1)}×</output>
+        </label>
+        <label>
+          Y scale{" "}
+          <input
+            aria-label="Vertical graph scale"
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.1"
+            value={yScale}
+            onChange={(event) => setYScale(Number(event.target.value))}
+          />
+          <output>{yScale.toFixed(1)}×</output>
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            setXScale(1);
+            setYScale(1);
+          }}
+        >
+          Reset spacing
+        </button>
+      </Panel>
       <FocusViewport
         id={focus}
         source={graph.edges.find((e) => e.id === selected)?.source}
