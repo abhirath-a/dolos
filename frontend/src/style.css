@@ -2750,6 +2750,49 @@ th,
     scroll-behavior: auto !important;
   }
 }
+
+/* Keep the investigation usable on short laptops and narrow screens. */
+.desk {
+  height: clamp(420px, 72dvh, 850px);
+  min-height: 0;
+}
+.network-canvas {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.graph-scale-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.graph-scale-controls button[aria-pressed="true"] {
+  color: #e4ff45;
+  font-weight: 700;
+}
+@media (max-width: 1000px) {
+  .desk,
+  .desk.inspector-expanded {
+    height: auto;
+    flex-direction: column;
+  }
+  .network-canvas {
+    height: clamp(360px, 65dvh, 650px);
+    flex: none;
+    width: 100%;
+  }
+  .inspector,
+  .desk.inspector-expanded .inspector {
+    width: 100%;
+    max-height: 70dvh;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .graph-scale-controls {
+    top: 86px !important;
+    left: 10px !important;
+    padding: 7px 10px;
+    max-width: calc(100% - 20px);
+  }
+}
 .investigation-picker {
   display: flex;
   align-items: center;

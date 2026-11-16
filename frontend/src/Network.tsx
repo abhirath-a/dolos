@@ -12,6 +12,7 @@ import {
   EdgeLabelRenderer,
   useReactFlow,
   useNodesInitialized,
+  useStore,
   type NodeProps,
   type Node,
   type EdgeProps,
@@ -169,6 +170,10 @@ export default function Network({
 }) {
   const [xScale, setXScale] = useState(1);
   const [yScale, setYScale] = useState(1);
+  const [interestOnly, setInterestOnly] = useState(false);
+  useEffect(() => {
+    if (!flags.size) setInterestOnly(false);
+  }, [flags.size]);
   const visible = useMemo(
     () =>
       graphEdgesForView(graph, flags, onlyFlags, context, pinned, contextOnly),
@@ -250,9 +255,13 @@ export default function Network({
           flagged: flaggedNodes.has(n.id),
           focused: focus === n.id,
           muted:
+            (interestOnly &&
+              !flaggedNodes.has(n.id) &&
+              n.id !== selectedEdge?.source &&
+              n.id !== selectedEdge?.target) ||
             (!!search &&
               !label(n).toLowerCase().includes(search.toLowerCase())) ||
-            (!!highlightedNodes && !highlightedNodes.has(n.id)),
+            (!interestOnly && !!highlightedNodes && !highlightedNodes.has(n.id)),
           degree: visible.filter((e) => e.source === n.id || e.target === n.id)
             .length,
         },
@@ -265,12 +274,14 @@ export default function Network({
         const targetSide =
           route[route.length - 1].x < targetPosition.x ? "left" : "right";
         const incident = !!focus && (e.source === focus || e.target === focus);
-        const dimmed = focus
-          ? !incident
-          : !!selected &&
-            e.id !== selected &&
-            e.id !== pinned &&
-            !context.has(e.id);
+        const dimmed = interestOnly
+          ? !flags.has(e.id) && e.id !== selected
+          : focus
+            ? !incident
+            : !!selected &&
+              e.id !== selected &&
+              e.id !== pinned &&
+              !context.has(e.id);
         const isContext = context.has(e.id),
           flag = flags.has(e.id),
           hot = e.id === selected || e.id === pinned || flag || incident;
@@ -296,7 +307,9 @@ export default function Network({
           label: money(e),
           data: {
             points: route,
-            showLabel: hot || visible.length <= 12,
+            showLabel: interestOnly
+              ? flag || e.id === selected
+              : hot || visible.length <= 12,
             flagged: flag,
             hot,
             active: e.id === selected,
@@ -306,7 +319,7 @@ export default function Network({
             strokeWidth:
               e.id === selected ? 5 : hot ? 2.5 : isContext ? 1.8 : 1.1,
             strokeDasharray: isContext && !hot ? "5 5" : undefined,
-            opacity: dimmed ? 0.2 : 1,
+            opacity: dimmed ? (interestOnly ? 0.08 : 0.2) : 1,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -327,6 +340,7 @@ export default function Network({
     search,
     context,
     pinned,
+    interestOnly,
   ]);
   if (!nodes.length)
     return (
@@ -354,8 +368,12 @@ export default function Network({
       edgeTypes={edgeTypes}
       fitView
       fitViewOptions={{ padding: 0.25, maxZoom: 1.15 }}
-      minZoom={0.15}
+      minZoom={0.02}
       maxZoom={2}
+      panOnScroll
+      zoomOnScroll={false}
+      zoomOnPinch
+      preventScrolling
       onEdgeClick={(_, e) => onSelect(e.id)}
       onNodeClick={(_, n) => onNode(n.id)}
       nodesDraggable={false}
@@ -369,6 +387,21 @@ export default function Network({
         className="graph-scale-controls nodrag nopan"
         aria-label="Graph spacing"
       >
+        <button
+          type="button"
+          aria-pressed={interestOnly}
+          disabled={!flags.size}
+          onClick={() => setInterestOnly((value) => !value)}
+          title={
+            flags.size
+              ? "Emphasize flagged transfers and their connected entities"
+              : "Run analysis to find points of interest"
+          }
+        >
+          {interestOnly
+            ? "Show all highlights"
+            : "Highlight points of interest"}
+        </button>
         <label>
           X scale{" "}
           <input
@@ -435,6 +468,8 @@ function FocusViewport({
 }) {
   const { fitView } = useReactFlow();
   const initialized = useNodesInitialized();
+  const width = useStore((state) => state.width);
+  const height = useStore((state) => state.height);
   useEffect(() => {
     if (!initialized) return;
     void fitView({
@@ -449,6 +484,6 @@ function FocusViewport({
         ? 0
         : 200,
     });
-  }, [id, source, target, initialized, fitView]);
+  }, [id, source, target, initialized, fitView, width, height]);
   return null;
 }
