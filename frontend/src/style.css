@@ -1,5 +1,6 @@
 @import "@fontsource-variable/manrope";
 @import "@fontsource-variable/inter";
+
 :root {
   font-family: "Inter Variable", sans-serif;
   font-size: 14px;
@@ -201,7 +202,7 @@ svg {
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  background: #fbfaf7;
+  background: #d9e4ff;
   padding: 0 25px 0 28px;
   gap: 25px;
 }
@@ -233,7 +234,7 @@ svg {
   height: 29px;
   width: 27px;
   border-radius: 3px 15px 15px 3px;
-  background: #263b6b;
+  background: #6b2626;
   display: inline-block;
   position: relative;
   margin-right: 3px;
@@ -2715,13 +2716,17 @@ th,
   color: #6c798d;
 }
 .investigation-picker select {
-  border: 0;
+  border: 5px solid transparent;
+  border-radius:5px;
   background: transparent;
   color: #3d4f6b;
   font-size: 12px;
   min-height: 40px;
   width: 100%;
   cursor: pointer;
+  padding-x: 5px;
+  padding-y: 0px;
+  outline: 1px solid #1e2a4e;
 }
 .header-navigation {
   margin-left: auto;
