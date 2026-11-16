@@ -15,6 +15,71 @@ log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
 LEASE_SECONDS = 300
 HEARTBEAT_SECONDS = 30
+INSERT_BATCH_ROWS = 100  # At most 700 parameters, below SQLite's legacy limit.
+SAVE_ATTEMPTS = 3
+
+
+def prepare_inserts(staged, prepared, document_id):
+    """Build bounded SQL batches on disk before opening the write transaction."""
+    buffers = {'transactions': [], 'relations': [], 'row_errors': []}
+
+    def flush(table):
+        if buffers[table]:
+            prepared.write(json.dumps([table, buffers[table]]) + '\n')
+            buffers[table] = []
+
+    staged.seek(0)
+    for line in staged:
+        index, row, error = json.loads(line)
+        if error:
+            table, values = 'row_errors', [document_id, index, error]
+        else:
+            table = 'relations' if row.get('record_type') == 'relation' else 'transactions'
+            values = [f'{document_id}:{index}', document_id, index, row['timestamp'],
+                      row['sender_id'], row['receiver_id'], json.dumps(row)]
+        buffers[table].append(values)
+        if len(buffers[table]) == INSERT_BATCH_ROWS:
+            flush(table)
+    for table in buffers:
+        flush(table)
+    prepared.flush()
+
+
+def save_document(store, job, prepared, accepted, rejected, review_required):
+    """Commit all rows and terminal status together. Retry only confirmed rollback."""
+    for attempt in range(SAVE_ATTEMPTS):
+        prepared.seek(0)
+        try:
+            with store.connect() as db:
+                db.execute('BEGIN IMMEDIATE')
+                current = db.execute('SELECT token,status FROM documents WHERE id=?', (job['id'],)).fetchone()
+                if current['token'] != job['token'] or current['status'] != 'processing':
+                    return  # Fence a result from a replaced worker.
+                for line in prepared:
+                    table, rows = json.loads(line)
+                    if table not in {'transactions', 'relations', 'row_errors'}:
+                        raise ValueError('Invalid prepared insertion table.')
+                    width = 3 if table == 'row_errors' else 7
+                    operation = 'INSERT OR REPLACE' if table == 'row_errors' else 'INSERT OR IGNORE'
+                    columns = ('document_id,source_row,error' if table == 'row_errors' else
+                               'id,document_id,source_row,timestamp,sender_id,receiver_id,payload')
+                    placeholders = ','.join(['(' + ','.join(['?'] * width) + ')'] * len(rows))
+                    db.execute(f'{operation} INTO {table} ({columns}) VALUES {placeholders}',
+                               [value for row in rows for value in row])
+                db.execute('''UPDATE documents SET status=?,accepted=?,rejected=?,lease_until=NULL
+                    WHERE id=? AND token=?''', ('needs_review' if rejected or review_required else 'completed',
+                                              accepted, rejected, job['id'], job['token']))
+            return
+        except ValueError as exc:
+            # This message confirms the server aborted the complete transaction.
+            # Do not retry a single INSERT or an ambiguous network/commit failure.
+            if 'interactive transaction was rolled back' not in str(exc).lower():
+                raise
+            if attempt + 1 == SAVE_ATTEMPTS:
+                raise DocumentError('The remote database rolled back the document save after three attempts. '
+                                    'No partial graph was committed. Retry processing after checking database connectivity.') from None
+            log.warning('Remote transaction expired; retrying complete document save (%s/%s): %s',
+                        attempt + 1, SAVE_ATTEMPTS, job['id'])
 
 
 def claim(store):
@@ -68,7 +133,7 @@ def process_one(store):
     try:
         location = store.object_location(job['id'])
         storage = storage_for(store.root, location['backend'] if location else 'local')
-        with heartbeat(store, job), storage.materialize(location, job['sha256'], job['suffix']) as path, tempfile.TemporaryFile(mode='w+t', encoding='utf-8') as staged:
+        with heartbeat(store, job), storage.materialize(location, job['sha256'], job['suffix']) as path, tempfile.TemporaryFile(mode='w+t', encoding='utf-8') as staged, tempfile.TemporaryFile(mode='w+t', encoding='utf-8') as prepared:
             stage = 'parsing document'
             accepted = rejected = 0
             review_required = False
@@ -79,26 +144,10 @@ def process_one(store):
                 review_required = review_required or bool(row and row.get('review_required'))
             if not accepted and not rejected:
                 raise DocumentError('Statement contains no transaction rows.')
-            staged.seek(0)
+            stage = 'preparing database inserts'
+            prepare_inserts(staged, prepared, job['id'])
             stage = 'saving extracted relationships'
-            with store.connect() as db:
-                db.execute('BEGIN IMMEDIATE')
-                current = db.execute('SELECT token,status FROM documents WHERE id=?', (job['id'],)).fetchone()
-                if current['token'] != job['token'] or current['status'] != 'processing':
-                    return True  # A replacement worker owns the lease; fence this result.
-                for line in staged:
-                    index, row, error = json.loads(line)
-                    if error:
-                        db.execute('INSERT OR REPLACE INTO row_errors VALUES(?,?,?)', (job['id'], index, error))
-                    else:
-                        tx_id = f"{job['id']}:{index}"
-                        table = 'relations' if row.get('record_type') == 'relation' else 'transactions'
-                        db.execute('INSERT OR IGNORE INTO ' + table + ' VALUES(?,?,?,?,?,?,?)',
-                                   (tx_id, job['id'], index, row['timestamp'], row['sender_id'],
-                                    row['receiver_id'], json.dumps(row)))
-                db.execute('''UPDATE documents SET status=?,accepted=?,rejected=?,lease_until=NULL
-                    WHERE id=? AND token=?''', ('needs_review' if rejected or review_required else 'completed',
-                                              accepted, rejected, job['id'], job['token']))
+            save_document(store, job, prepared, accepted, rejected, review_required)
     except Exception as exc:
         log.exception('Document processing failed: %s (%s)', job['id'], stage)
         # No source text or account data is returned in public diagnostics.

@@ -352,9 +352,13 @@ export default function App() {
         response.model.scores?.find((s) => s.explanation)?.transaction_id ||
         response.findings[0]?.edge_id ||
         null;
-      setPinned(first);
-      setSelected(first);
-      setTab("analysis");
+      const clicked = requestedEdge.current;
+      const scored = response.model.scores?.some(
+        (s) => s.transaction_id === clicked,
+      );
+      setPinned(clicked ? (scored ? clicked : null) : first);
+      setSelected(clicked || first);
+      setTab(clicked && !scored ? "evidence" : "analysis");
       setContextView(false);
     },
   });
@@ -364,7 +368,9 @@ export default function App() {
     analyze.isError && analyze.variables?.key === analysisKey
       ? analyze.error.message
       : "";
+  const requestedEdge = useRef<string | null>(null);
   function run() {
+    requestedEdge.current = null;
     analyze.mutate({
       key: analysisKey,
       selection,
@@ -392,6 +398,14 @@ export default function App() {
     clearSelection();
     setSelection(next);
     setView("workspace");
+  }
+  function selectGraphEdge(id: string) {
+    requestedEdge.current = id;
+    setSelected(id);
+    setFocus(null);
+    const scored = analysis?.model.scores?.some((s) => s.transaction_id === id);
+    setPinned(scored ? id : null);
+    setTab(scored ? "analysis" : "evidence");
   }
   function inspect(id: string) {
     setSelected(id);
@@ -929,7 +943,7 @@ export default function App() {
                         onlyFlags={onlyFlags}
                         context={context}
                         contextOnly={contextView}
-                        onSelect={inspect}
+                        onSelect={selectGraphEdge}
                         onNode={(id) => {
                           setFocus(focus === id ? null : id);
                           setTab("entities");

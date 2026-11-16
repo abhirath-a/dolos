@@ -37,6 +37,11 @@ export default function Ledger({
   useEffect(() => setPage(0), [graph, search, onlyFlags, focus]);
   const filtered = filterEdges(graph, search, flags, onlyFlags, focus),
     range = pageRange(filtered, page, 10);
+  useEffect(() => {
+    if (!selected) return;
+    const index = filtered.findIndex((edge) => edge.id === selected);
+    if (index >= 0) setPage(Math.floor(index / 10));
+  }, [selected, graph, search, onlyFlags, focus]);
   return (
     <section className="ledger">
       <div className="section-title">

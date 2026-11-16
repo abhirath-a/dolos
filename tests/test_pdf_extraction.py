@@ -370,3 +370,145 @@ def test_quota_error_never_switches_to_paid_model(monkeypatch):
         with pytest.raises(pdf.DocumentError, match='no paid-model fallback'):
             pdf.request_extraction(client, [{'type': 'input_text', 'text': 'Statement'}], 'openrouter/free')
     assert len(calls) == 1 and calls[0]['model'] == 'openrouter/free'
+
+
+def sdk_extraction_response(payload, *, status='completed', refusal=False):
+    import httpx
+    content = ({'type': 'refusal', 'refusal': 'Cannot extract'} if refusal else
+               {'type': 'output_text', 'text': json.dumps(payload), 'annotations': []})
+    return httpx.Response(200, json={
+        'id': 'resp_test', 'object': 'response', 'created_at': 0,
+        'model': 'nvidia/test-vision:free', 'status': status,
+        'output': [{'id': 'msg_test', 'type': 'message', 'role': 'assistant',
+                    'status': 'completed', 'content': [content]}]})
+
+
+def test_schema_retry_uses_same_model_and_preserves_complete_request(monkeypatch):
+    openai = pytest.importorskip('openai')
+    import httpx
+    monkeypatch.setenv('DOLOS_PDF_PROVIDER', 'openrouter')
+    calls = []
+    valid = result([transfer()]).model_dump()
+    invalid = result([transfer()]).model_dump()
+    invalid['transfers'][0]['sender']['account'] = 123456
+
+    def handler(request):
+        calls.append(json.loads(request.content))
+        return sdk_extraction_response(invalid if len(calls) == 1 else valid)
+
+    content = [{'type': 'input_text', 'text': 'Synthetic source statement'}]
+    with openai.OpenAI(api_key='fake', max_retries=0, base_url='https://openrouter.ai/api/v1',
+                      http_client=httpx.Client(transport=httpx.MockTransport(handler))) as client:
+        extracted = pdf.request_extraction(client, content, 'nvidia/test-vision:free')
+    assert len(calls) == 2
+    assert extracted.transfers[0].sender.account is None
+    assert extracted._resolved_model == 'nvidia/test-vision:free'
+    for call in calls:
+        assert call['model'] == 'nvidia/test-vision:free'
+        assert call['provider'] == {'sort': 'price', 'require_parameters': True}
+        assert call['text']['format']['strict'] is True
+        assert call['input'][1]['content'] == content
+        assert 'models' not in call and 'plugins' not in call
+    assert 'transfers.0.sender.account: string_type' in calls[1]['input'][0]['content']
+    assert 'Do not invent values, omit transfers' in calls[1]['input'][0]['content']
+
+
+def test_exhausted_schema_retry_exposes_paths_without_source_values(monkeypatch, caplog):
+    openai = pytest.importorskip('openai')
+    import httpx
+    monkeypatch.setenv('DOLOS_PDF_PROVIDER', 'openrouter')
+    calls = []
+    payload = result([transfer(evidence='PRIVATE SOURCE QUOTE')]).model_dump()
+    payload['transfers'][0]['sender']['account'] = 987654321
+    payload['transfers'][0]['SECRET ACCOUNT KEY'] = 'PRIVATE VALUE'
+
+    def handler(request):
+        calls.append(json.loads(request.content))
+        return sdk_extraction_response(payload)
+
+    with openai.OpenAI(api_key='fake', max_retries=0, base_url='https://openrouter.ai/api/v1',
+                      http_client=httpx.Client(transport=httpx.MockTransport(handler))) as client:
+        with pytest.raises(pdf.DocumentError, match='after two attempts') as caught:
+            pdf.request_extraction(client, [{'type': 'input_text', 'text': 'PRIVATE INPUT'}], 'nvidia/test-vision:free')
+    assert len(calls) == 2
+    message = str(caught.value)
+    assert 'transfers.0.sender.account: string_type' in message
+    assert 'transfers.0.<field>: extra_forbidden' in message
+    assert 'No partial graph was committed' in message
+    for secret in ('987654321', 'SECRET ACCOUNT KEY', 'PRIVATE VALUE', 'PRIVATE SOURCE QUOTE', 'PRIVATE INPUT'):
+        assert secret not in message
+        assert secret not in caplog.text
+        assert secret not in calls[1]['input'][0]['content']
+
+
+def test_omitted_nullable_facts_become_null_without_inventing_values(monkeypatch):
+    openai = pytest.importorskip('openai')
+    import httpx
+    monkeypatch.setenv('DOLOS_PDF_PROVIDER', 'openrouter')
+    payload = {'transfers': [{
+        'sender': {'name': 'Person B', 'kind': 'person'},
+        'receiver': {'name': 'Person A', 'kind': 'person'},
+        'description': 'Transfer to Person A', 'evidence': 'Transfer to Person A',
+        'page': 1, 'confidence': 'high'}], 'warnings': [], 'complete': True}
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return sdk_extraction_response(payload)
+
+    with openai.OpenAI(api_key='fake', max_retries=0, base_url='https://openrouter.ai/api/v1',
+                      http_client=httpx.Client(transport=httpx.MockTransport(handler))) as client:
+        extracted = pdf.request_extraction(client, [], 'nvidia/test-vision:free')
+    assert len(calls) == 1
+    item = extracted.transfers[0]
+    assert item.sender.account is None and item.sender.bank is None
+    assert item.timestamp is None and item.amount is None and item.currency is None
+    assert item.reference is None and item.review_reason is None
+    row = pdf.normalize_transfer(item, 'document-hash', 'nvidia/test-vision:free', 'text')
+    assert row['review_required']
+    assert row['amount'] is None and row['timestamp'] is None and row['currency'] is None
+
+
+@pytest.mark.parametrize('required_field', ['evidence', 'page', 'confidence', 'complete'])
+def test_schema_retry_keeps_critical_extraction_fields_required(monkeypatch, required_field):
+    openai = pytest.importorskip('openai')
+    import httpx
+    monkeypatch.setenv('DOLOS_PDF_PROVIDER', 'openrouter')
+    payload = result([transfer()]).model_dump()
+    if required_field == 'complete':
+        del payload[required_field]
+    else:
+        del payload['transfers'][0][required_field]
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return sdk_extraction_response(payload)
+
+    with openai.OpenAI(api_key='fake', max_retries=0, base_url='https://openrouter.ai/api/v1',
+                      http_client=httpx.Client(transport=httpx.MockTransport(handler))) as client:
+        with pytest.raises(pdf.DocumentError, match=f'{required_field}: missing'):
+            pdf.request_extraction(client, [], 'nvidia/test-vision:free')
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize('failure', ['refusal', 'incomplete', 'not_complete'])
+def test_schema_retry_does_not_repeat_refused_or_incomplete_outputs(monkeypatch, failure):
+    openai = pytest.importorskip('openai')
+    import httpx
+    monkeypatch.setenv('DOLOS_PDF_PROVIDER', 'openrouter')
+    payload = result([transfer()]).model_dump()
+    if failure == 'not_complete':
+        payload['complete'] = False
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return sdk_extraction_response(payload, status='incomplete' if failure == 'incomplete' else 'completed',
+                                       refusal=failure == 'refusal')
+
+    with openai.OpenAI(api_key='fake', max_retries=0, base_url='https://openrouter.ai/api/v1',
+                      http_client=httpx.Client(transport=httpx.MockTransport(handler))) as client:
+        with pytest.raises(pdf.DocumentError, match='refused or incomplete|could not read all'):
+            pdf.request_extraction(client, [], 'nvidia/test-vision:free')
+    assert len(calls) == 1

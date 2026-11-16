@@ -1,9 +1,12 @@
 import json
 import os
+import logging
 from contextlib import contextmanager
 from pathlib import Path
 
 from .database import Database
+
+log = logging.getLogger(__name__)
 
 
 class Store:
@@ -26,7 +29,12 @@ class Store:
             yield db
             db.commit()
         except BaseException:
-            db.rollback()
+            try:
+                db.rollback()
+            except Exception as rollback_error:
+                # The remote server can already have rolled the transaction back.
+                # Cleanup must not replace the error that caused this failure.
+                log.warning('Database rollback failed; original error retained (%s).', type(rollback_error).__name__)
             raise
         finally:
             db.close()

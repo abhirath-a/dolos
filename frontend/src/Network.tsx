@@ -357,7 +357,11 @@ export default function Network({
       colorMode="dark"
       proOptions={{ hideAttribution: true }}
     >
-      <FocusViewport id={focus} />
+      <FocusViewport
+        id={focus}
+        source={graph.edges.find((e) => e.id === selected)?.source}
+        target={graph.edges.find((e) => e.id === selected)?.target}
+      />
       <Background color="#3b4752" gap={28} size={1} />
       <Controls showInteractive={false} />
       <MiniMap
@@ -372,19 +376,31 @@ export default function Network({
   );
 }
 
-function FocusViewport({ id }: { id: string | null }) {
+function FocusViewport({
+  id,
+  source,
+  target,
+}: {
+  id: string | null;
+  source?: string;
+  target?: string;
+}) {
   const { fitView } = useReactFlow();
   const initialized = useNodesInitialized();
   useEffect(() => {
     if (!initialized) return;
     void fitView({
-      nodes: id ? [{ id }] : undefined,
-      padding: id ? 1 : 0.22,
+      nodes: id
+        ? [{ id }]
+        : source && target
+          ? [{ id: source }, { id: target }]
+          : undefined,
+      padding: id ? 1 : source ? 0.4 : 0.22,
       maxZoom: id ? 1.3 : 1.15,
       duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? 0
         : 200,
     });
-  }, [id, initialized, fitView]);
+  }, [id, source, target, initialized, fitView]);
   return null;
 }

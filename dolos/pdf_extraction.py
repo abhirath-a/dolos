@@ -3,6 +3,7 @@ import base64
 import hashlib
 import io
 import json
+import logging
 import os
 import re
 import threading
@@ -10,9 +11,11 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError
 
 from .parsers import DocumentError, timestamp
+
+log = logging.getLogger(__name__)
 
 
 class ExtractionModel(BaseModel):
@@ -20,24 +23,24 @@ class ExtractionModel(BaseModel):
 
 
 class Party(ExtractionModel):
-    name: Optional[str] = Field(description='Explicit person or organization name, or null')
-    bank: Optional[str]
-    account: Optional[str] = Field(description='Account identifier exactly as printed, including masking')
+    name: Optional[str] = Field(default=None, description='Explicit person or organization name, or null')
+    bank: Optional[str] = None
+    account: Optional[str] = Field(default=None, description='Account identifier exactly as printed, including masking')
     kind: Literal['person', 'organization', 'unknown']
 
 
 class Transfer(ExtractionModel):
     sender: Party
     receiver: Party
-    timestamp: Optional[str] = Field(description='ISO 8601 date/time only if supported by statement context')
-    amount: Optional[str] = Field(description='Nonnegative decimal string without separators, or null')
-    currency: Optional[str]
+    timestamp: Optional[str] = Field(default=None, description='ISO 8601 date/time only if supported by statement context')
+    amount: Optional[str] = Field(default=None, description='Nonnegative decimal string without separators, or null')
+    currency: Optional[str] = None
     description: str
     evidence: str = Field(description='Short verbatim source quote identifying the transfer and its direction')
     page: int = Field(description='Original one-based PDF page where this transaction starts')
-    reference: Optional[str]
+    reference: Optional[str] = None
     confidence: Literal['high', 'medium', 'low']
-    review_reason: Optional[str]
+    review_reason: Optional[str] = None
 
 
 class Extraction(ExtractionModel):
@@ -63,6 +66,9 @@ Quote short verbatim evidence for each transfer; page is the ORIGINAL page numbe
 Extract a transaction only on the target page where it STARTS, even if it continues on another page.
 Context pages are for interpretation only: never extract their transactions unless also target pages.
 Set complete=false if pages are unreadable or the output would omit/truncate transactions.
+Follow the JSON schema. Include all required fields, even when a value is null.
+Use strings for amounts and account identifiers. Use an integer for the page number.
+Use person, organization, or unknown for each party kind. Use [] for warnings when none apply.
 '''
 
 
@@ -92,31 +98,64 @@ def _client():
     return OpenAI(api_key=key, timeout=180, max_retries=2, **options)
 
 
+def validation_summary(exc):
+    """Expose schema paths and error types, never source values or raw output."""
+    fields = set().union(*(schema.model_fields for schema in (Extraction, Transfer, Party)))
+    fields.update(('output', 'content', 'text', 'type', 'status', 'model', 'response'))
+    details = []
+    for error in exc.errors(include_input=False, include_context=False, include_url=False)[:8]:
+        path = '.'.join(str(part) if isinstance(part, int) else part if part in fields else '<field>'
+                        for part in error['loc']) or 'response'
+        kind = error['type'] if re.fullmatch(r'[a-z_]{1,60}', error['type']) else 'invalid_value'
+        details.append(f'{path}: {kind}')
+    return '; '.join(details)
+
+
 def request_extraction(client, content, model):
     options = {}
     if provider() == 'openrouter':
         # No model fallbacks and no PDF parser plugins. Free routes stay free;
         # explicitly configured paid models prefer the cheapest compatible endpoint.
         options['extra_body'] = {'provider': {'sort': 'price', 'require_parameters': True}}
-    try:
-        response = client.responses.parse(
-            model=model, store=False, max_output_tokens=16000,
-            input=[{'role': 'system', 'content': INSTRUCTIONS}, {'role': 'user', 'content': content}],
-            text_format=Extraction, **options)
-    except Exception as exc:
-        status = getattr(exc, 'status_code', None)
-        if status == 429:
-            raise DocumentError('PDF extraction rate/quota limit reached. Retry later; no paid-model fallback was used.') from None
-        if status == 402:
-            raise DocumentError('PDF extraction provider requires credits. No alternative paid model was used.') from None
-        raise DocumentError(f'PDF extraction provider failed ({type(exc).__name__}); retry the document or check worker configuration.') from None
-    if response.status != 'completed' or response.output_parsed is None:
-        raise DocumentError('PDF extraction was refused or incomplete; no partial graph was committed.')
-    result = Extraction.model_validate(response.output_parsed)
-    if not result.complete:
-        raise DocumentError('PDF extraction could not read all target transactions; no partial graph was committed.')
-    result._resolved_model = getattr(response, 'model', None)
-    return result
+    repair = ''
+    for attempt in range(2):
+        try:
+            response = client.responses.parse(
+                model=model, store=False, max_output_tokens=16000,
+                input=[{'role': 'system', 'content': INSTRUCTIONS + repair}, {'role': 'user', 'content': content}],
+                text_format=Extraction, **options)
+            if response.status != 'completed' or response.output_parsed is None:
+                raise DocumentError('PDF extraction was refused or incomplete; no partial graph was committed.')
+            result = Extraction.model_validate(response.output_parsed)
+        except ValidationError as exc:
+            detail = validation_summary(exc)
+            log.warning('PDF extraction schema validation failed (%s/2): %s', attempt + 1, detail)
+            if attempt == 1:
+                raise DocumentError('PDF extraction returned invalid structured data after two attempts. '
+                                    f'Fields: {detail}. No partial graph was committed. '
+                                    'Use a model endpoint with strict structured-output support, then retry processing.') from None
+            repair = ('\nThe previous response failed schema validation at: ' + detail + '. '
+                      'Extract all target transfers again. Follow the exact schema. '
+                      'Do not invent values, omit transfers, or remove required fields to fix the error. '
+                      'Use null for absent optional facts. Preserve account identifiers as strings.\n')
+            continue
+        except DocumentError:
+            raise
+        except Exception as exc:
+            status = getattr(exc, 'status_code', None)
+            if status == 429:
+                raise DocumentError('PDF extraction rate/quota limit reached. Retry later; no paid-model fallback was used.') from None
+            if status == 402:
+                raise DocumentError('PDF extraction provider requires credits. No alternative paid model was used.') from None
+            if status in (401, 403):
+                raise DocumentError(f'PDF extraction access denied (HTTP {status}). Check the worker provider key and model access.') from None
+            if status in (400, 404, 422):
+                raise DocumentError(f'PDF extraction request rejected (HTTP {status}). Check the configured model endpoint supports structured output and the supplied input type.') from None
+            raise DocumentError(f'PDF extraction provider failed ({type(exc).__name__}); retry the document or check worker configuration.') from None
+        if not result.complete:
+            raise DocumentError('PDF extraction could not read all target transactions; no partial graph was committed.')
+        result._resolved_model = getattr(response, 'model', None)
+        return result
 
 
 _RENDER_LOCK = threading.Lock()  # PDFium calls must not overlap across worker threads.
