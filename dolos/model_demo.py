@@ -91,12 +91,76 @@ def build_demo(output=None, epochs=8):
         'focus_edge_id': focus, 'graph': graph, 'models': models,
         'provenance': {'kind': 'synthetic', 'license': 'Project-generated teaching fixture',
                        'training_policy': 'Chronological train/validation/test splits; test predictions occur after model selection. Labels describe generated routing motifs.'}}
+    add_examples(payload, rows, artifacts)
     output = Path(output) if output else root / 'frontend' / 'public' / 'model-demo.json'
     output.write_text(json.dumps(payload, indent=2) + '\n')
     (output.parent / 'demo-transfers.csv').write_bytes(source.read_bytes())
     export_runtime_bundle(root, payload, artifacts, source)
     print(json.dumps({'output': str(output), 'display_edges': len(graph['edges']),
                       'focus_margin': models['graphsage']['scores'][0]['score'], 'run_id': manifest['run_id']}))
+
+
+def add_examples(payload, rows, artifacts):
+    """Build judge-ready source views; predictions are recomputed by analyze_demo.
+
+    These are different windows of the same disclosed teaching source, not new
+    independent evaluation datasets. Labels and cached predictions are omitted.
+    """
+    from .graph import build_graph
+    from .inference import score
+    latest = datetime.fromisoformat(rows[-1]['timestamp']).replace(minute=0, second=0, microsecond=0)
+    window = [row for row in rows if datetime.fromisoformat(row['timestamp']) >= latest]
+    incoming = [row for row in window if row['from_account'] in {'0000', '0001'} and row['to_account'] == '0003']
+    ordinary = [row for row in window if int(row['from_account']) >= 6 and int(row['to_account']) >= 6]
+    groups = [
+        ('incoming-collection', 'Two senders, one collector',
+         'Inspect two generated transfers into Account 0003, with the earlier history actually sampled by GraphSAGE.', incoming),
+        ('ordinary-payments', 'Ordinary payment comparison',
+         'A comparison group of eight generated payments. Run either model to inspect its decisions; unflagged transfers are not certified safe.', ordinary),
+        ('mixed-network', 'Routing and ordinary payments',
+         'Compare all twelve transfers in the final source hour: four generated routing transfers alongside eight ordinary-payment motifs.', window),
+    ]
+    examples = [{
+        'id': 'pass-through', 'title': payload['title'], 'description': payload['description'],
+        'focus_edge_id': payload['focus_edge_id'], 'focus_edge_ids': [payload['focus_edge_id']],
+        'graph': payload['graph'],
+    }]
+    for identifier, title, description, targets in groups:
+        if not targets:
+            raise ValueError('Example source does not contain the required synthetic window.')
+        target_ids = {row['id'] for row in targets}
+        display_ids = set(target_ids)
+        for model in ('graphsage', 'graph_xgboost'):
+            prediction = score(rows, artifacts, model, len(targets), target_ids=target_ids, explain=True)
+            if {item['transaction_id'] for item in prediction['scores']} != target_ids:
+                raise ValueError('Every example target must be eligible for both frozen models.')
+        # Keep the initial graph readable. The inspector adds the selected
+        # prediction's actual sampled history dynamically after live analysis.
+        graph = build_graph([row for row in rows if row['id'] in display_ids])
+        for node in graph['nodes']:
+            node['label'] = 'Account ' + node['account']
+        examples.append({'id': identifier, 'title': title, 'description': description,
+                         'focus_edge_id': targets[0]['id'],
+                         'focus_edge_ids': [row['id'] for row in targets], 'graph': graph})
+    payload['examples'] = examples
+    return payload
+
+
+def refresh_examples():
+    """Refresh views from packaged data/weights without training or changing weights."""
+    from .parsers import parse_document
+    data, artifacts, source = demo_paths()
+    if not artifacts:
+        raise ValueError('Install the packaged demo assets before refreshing examples.')
+    rows = [dict(row, id=f'simulation:{index}', document_id='synthetic-transfers.csv', source_row=index)
+            for index, row, error in parse_document(source, '.csv') if not error]
+    if hashlib.sha256(source.read_bytes()).hexdigest() != data['source_sha256']:
+        raise ValueError('Example source fingerprint mismatch.')
+    add_examples(data, rows, artifacts)
+    root = Path(__file__).parent.parent
+    for output in (root / 'frontend/public/model-demo.json', Path(__file__).parent / 'demo_assets/model-demo.json'):
+        output.write_text(json.dumps(data, indent=2) + '\n')
+    return data
 
 
 def export_runtime_bundle(root, payload, artifacts, source):
@@ -136,10 +200,13 @@ def demo_paths():
     return data, ready, source
 
 
-def analyze_demo(model):
+def analyze_demo(model, example=None):
     from .inference import score, ModelUnavailable
     from .parsers import parse_document
     data, directory, source = demo_paths()
+    selected = next((item for item in (data or {}).get('examples', []) if item['id'] == example), None) if example else None
+    if example and selected is None:
+        raise ValueError('Unknown model example.')
     if not directory:
         raise ModelUnavailable('Live demonstration artifacts are not installed. Deploy the packaged demo_assets including graphsage.npz; no recorded prediction was substituted.')
     if hashlib.sha256(source.read_bytes()).hexdigest() != data['source_sha256']:
@@ -149,7 +216,8 @@ def analyze_demo(model):
         raise ModelUnavailable('Demo artifact does not match the displayed graph. Regenerate the demo.')
     rows = [dict(row, id=f'simulation:{index}', document_id='synthetic-transfers.csv', source_row=index)
             for index, row, error in parse_document(source, '.csv') if not error]
-    result = score(rows, directory, model, 1, target_ids={data['focus_edge_id']}, explain=True)
+    targets = set(selected['focus_edge_ids']) if selected else {data['focus_edge_id']}
+    result = score(rows, directory, model, len(targets), target_ids=targets, explain=True)
     return dict(result, status='completed', name=model, threshold=0)
 
 

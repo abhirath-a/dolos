@@ -73,8 +73,8 @@ export function demoAnalysis(
   return {
     method: "trained_model",
     summary: findings.length
-      ? "The selected transfer was flagged by the model."
-      : "The selected transfer was not flagged by the model.",
+      ? `${findings.length} of ${model.scores?.length || 0} scored transfers flagged by the model.`
+      : "No scored transfers were flagged by the model.",
     limitation:
       "Synthetic teaching data and a small demonstration model. These outputs do not establish real-world accuracy or criminal responsibility.",
     findings,

@@ -114,12 +114,17 @@ def create_app(data_dir=None):
                 'data_type': 'synthetic_teaching_data'}
 
     @app.post('/demo/model/analyze')
-    def model_demo_analyze(model: Literal['graphsage', 'graph_xgboost'] = 'graphsage'):
+    def model_demo_analyze(model: Literal['graphsage', 'graph_xgboost'] = 'graphsage',
+                           example: Optional[str] = Query(None, max_length=80)):
         from .model_demo import analyze_demo
         try:
-            return analyze_demo(model)
+            return analyze_demo(model, example)
         except ModelUnavailable as exc:
             raise HTTPException(503, str(exc))
+        except ValueError as exc:
+            if str(exc) == 'Unknown model example.':
+                raise HTTPException(404, str(exc))
+            raise
 
     @app.get('/demo/cases')
     def demo_cases():

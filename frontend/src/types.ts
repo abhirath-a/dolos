@@ -173,6 +173,14 @@ export interface ContextTransaction {
   source_row?: number;
   hop?: number;
 }
+export interface ModelExample {
+  id: string;
+  title: string;
+  description: string;
+  focus_edge_id: string;
+  focus_edge_ids: string[];
+  graph: Graph;
+}
 export interface ModelDemo {
   id: string;
   title: string;
@@ -189,6 +197,7 @@ export interface ModelDemo {
   models: Record<string, Analysis["model"]>;
   generator: string;
   provenance: { kind: string; training_policy: string };
+  examples?: ModelExample[];
 }
 export interface Investigation {
   id: string;

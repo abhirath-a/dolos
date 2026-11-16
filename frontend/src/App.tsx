@@ -80,7 +80,9 @@ export default function App() {
     const saved = stored<unknown>("dolos:selection", "demo");
     return typeof saved === "string" &&
       saved.length < 150 &&
-      (saved === "demo" || saved.startsWith("investigation:"))
+      (saved === "demo" ||
+        saved.startsWith("example:") ||
+        saved.startsWith("investigation:"))
       ? saved
       : "demo";
   });
@@ -112,7 +114,7 @@ export default function App() {
   const [documentBatchIds, setDocumentBatchIds] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const mode =
-    selection === "demo"
+    selection === "demo" || selection.startsWith("example:")
       ? "demo"
       : selection.startsWith("case:")
         ? "historical"
@@ -127,6 +129,31 @@ export default function App() {
     queryFn: () => loadAsset<ModelDemo>("/model-demo.json"),
     staleTime: Infinity,
   });
+  const selectedExample = selection.startsWith("example:")
+    ? demoQuery.data?.examples?.find(
+        (example) => example.id === selection.slice(8),
+      )
+    : undefined;
+  const activeDemo = useMemo<ModelDemo | undefined>(
+    () =>
+      demoQuery.data && selectedExample
+        ? { ...demoQuery.data, ...selectedExample }
+        : demoQuery.data,
+    [demoQuery.data, selectedExample],
+  );
+  useEffect(() => {
+    if (
+      selection.startsWith("example:") &&
+      demoQuery.data &&
+      !selectedExample
+    ) {
+      setSelection("demo");
+      setResult(null);
+      setSelected(null);
+      setPinned(null);
+      setContextView(false);
+    }
+  }, [selection, demoQuery.data, selectedExample]);
   const health = useQuery({
     queryKey: ["health"],
     queryFn: () =>
@@ -210,13 +237,13 @@ export default function App() {
   const baseGraph = useMemo<Graph>(
     () =>
       mode === "demo"
-        ? demoQuery.data?.graph || EMPTY
+        ? activeDemo?.graph || EMPTY
         : mode === "historical"
           ? currentCase
             ? { nodes: currentCase.nodes, edges: currentCase.edges }
             : EMPTY
           : graphQuery.data || EMPTY,
-    [mode, demoQuery.data, currentCase, graphQuery.data],
+    [mode, activeDemo, currentCase, graphQuery.data],
   );
   const analysisKey = JSON.stringify([
     selection,
@@ -279,14 +306,40 @@ export default function App() {
       batchIds: string[];
       edgeIds: string[];
     }) => {
-      if (input.selection === "demo") {
+      if (
+        input.selection === "demo" ||
+        input.selection.startsWith("example:")
+      ) {
         if (!demoQuery.data)
           throw new Error("The teaching fixture has not loaded. Try again.");
+        const example = input.selection.startsWith("example:")
+          ? demoQuery.data.examples?.find(
+              (item) => item.id === input.selection.slice(8),
+            )
+          : undefined;
+        if (input.selection.startsWith("example:") && !example)
+          throw new Error(
+            "This example is no longer available. Choose another example.",
+          );
         const response = await api<Analysis["model"]>(
-          `/demo/model/analyze?model=${input.model}`,
+          `/demo/model/analyze?model=${input.model}${example ? `&example=${encodeURIComponent(example.id)}` : ""}`,
           { method: "POST" },
         );
-        return demoAnalysis(demoQuery.data, response);
+        const targets = new Set(
+          example?.focus_edge_ids || [demoQuery.data.focus_edge_id],
+        );
+        if (
+          response.run_id !== demoQuery.data.run_id ||
+          response.scores?.length !== targets.size ||
+          response.scores.some((score) => !targets.has(score.transaction_id))
+        )
+          throw new Error(
+            "The API and this example do not match. Deploy the API and frontend from the same revision, then reload.",
+          );
+        return demoAnalysis(
+          example ? { ...demoQuery.data, ...example } : demoQuery.data,
+          response,
+        );
       }
       return jsonPost<Analysis>(
         "/analyze",
@@ -305,7 +358,9 @@ export default function App() {
         key: input.key,
         analysis: response,
         execution:
-          input.selection === "demo" ? "Live model run" : "Live analysis",
+          input.selection === "demo" || input.selection.startsWith("example:")
+            ? "Live model run"
+            : "Live analysis",
       });
       const first =
         response.model.scores?.find((s) => s.explanation)?.transaction_id ||
@@ -383,7 +438,7 @@ export default function App() {
   }, [selection, investigations]);
   const title =
     mode === "demo"
-      ? demoQuery.data?.title || "The pass-through network"
+      ? activeDemo?.title || "The pass-through network"
       : mode === "historical"
         ? currentCase?.title.split(":")[0] || "Historical investigation"
         : investigation?.name || "Uploaded statements";
@@ -391,7 +446,7 @@ export default function App() {
     mode === "historical"
       ? currentCase?.caveat
       : mode === "demo"
-        ? demoQuery.data?.notice
+        ? activeDemo?.notice
         : undefined;
   const sourceLabel =
     mode === "demo"
@@ -508,8 +563,15 @@ export default function App() {
             value={selection}
             onChange={(e) => choose(e.target.value)}
           >
-            <optgroup label="Live model example">
+            <optgroup label="Live model examples">
               <option value="demo">Pass-through network</option>
+              {demoQuery.data?.examples
+                ?.filter((example) => example.id !== "pass-through")
+                .map((example) => (
+                  <option key={example.id} value={`example:${example.id}`}>
+                    {example.title}
+                  </option>
+                ))}
             </optgroup>
             {!!investigations.length && (
               <optgroup label="Your investigations">
@@ -647,6 +709,7 @@ export default function App() {
                       {sourceLabel}
                     </span>
                     {mode === "historical" && <span>{currentCase?.hook}</span>}
+                    {mode === "demo" && <span>{activeDemo?.description}</span>}
                   </div>
                 </div>
                 <button
@@ -995,7 +1058,7 @@ export default function App() {
                   onContextView={toggleContext}
                   expanded={expanded}
                   onExpand={() => setExpanded((v) => !v)}
-                  demo={mode === "demo" ? demoQuery.data : undefined}
+                  demo={mode === "demo" ? activeDemo : undefined}
                 />
               </div>
               <div className="graph-scopebar">

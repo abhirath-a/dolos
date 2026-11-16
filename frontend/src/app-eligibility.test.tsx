@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import demo from "../public/model-demo.json";
 import cases from "../public/cases.json";
+import type { ModelDemo } from "./types";
 vi.mock("./Network", () => ({ default: () => <div>Test graph surface</div> }));
 afterEach(() => {
   cleanup();
@@ -116,12 +117,12 @@ describe("model eligibility", () => {
   });
 });
 
-function renderDemo() {
+function renderDemo(data: ModelDemo = demo) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   client.setQueryData(["cases"], cases);
-  client.setQueryData(["model-demo"], demo);
+  client.setQueryData(["model-demo"], data);
   client.setQueryData(["health"], {
     model_configured: false,
     available_models: [],
@@ -217,6 +218,139 @@ it("shows live inference errors without substituting stored scores", async () =>
   await screen.findByText("Model artifacts are not installed.");
   expect(screen.queryByRole("button", { name: /recorded/i })).toBeNull();
   expect(screen.queryByText("Raw model margin")).toBeNull();
+});
+
+const judgeDemo: ModelDemo = {
+  ...demo,
+  examples: [
+    {
+      id: "pass-through",
+      title: "The pass-through network",
+      description: "Default routing example.",
+      focus_edge_id: demo.focus_edge_id,
+      focus_edge_ids: [demo.focus_edge_id],
+      graph: demo.graph,
+    },
+    {
+      id: "incoming-collection",
+      title: "Incoming collection",
+      description: "Two simulated senders transfer into one collector.",
+      focus_edge_id: demo.focus_edge_id,
+      focus_edge_ids: [demo.focus_edge_id],
+      graph: demo.graph,
+    },
+    {
+      id: "ordinary-payments",
+      title: "Ordinary payments",
+      description: "A comparison of generated ordinary payments.",
+      focus_edge_id: demo.focus_edge_id,
+      focus_edge_ids: [demo.focus_edge_id],
+      graph: demo.graph,
+    },
+    {
+      id: "mixed-network",
+      title: "Mixed network",
+      description: "Generated routing and ordinary transfers together.",
+      focus_edge_id: demo.focus_edge_id,
+      focus_edge_ids: [demo.focus_edge_id],
+      graph: demo.graph,
+    },
+  ],
+};
+
+it("offers all judge examples without duplicating the default and clears results on switch", async () => {
+  const fetch = vi.fn(
+    async () => new Response(JSON.stringify(demo.models.graphsage)),
+  );
+  vi.stubGlobal("fetch", fetch);
+  renderDemo(judgeDemo);
+  const picker = screen.getByRole("combobox", { name: "Choose investigation" });
+  expect(
+    screen
+      .getByRole("group", { name: "Live model examples" })
+      .querySelectorAll("option"),
+  ).toHaveLength(4);
+  for (const item of judgeDemo.examples!.filter(
+    (entry) => entry.id !== "pass-through",
+  ))
+    expect(screen.getByRole("option", { name: item.title })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Run GraphSAGE" }));
+  await screen.findByText("GraphSAGE · Live model run");
+  fireEvent.change(picker, {
+    target: { value: "example:incoming-collection" },
+  });
+  expect(
+    screen.getByRole("heading", { name: "Incoming collection" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByText("Two simulated senders transfer into one collector."),
+  ).toBeTruthy();
+  expect(screen.queryByText("GraphSAGE · Live model run")).toBeNull();
+  expect(screen.queryByText("Raw model margin")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Run GraphSAGE" }));
+  await screen.findByText("GraphSAGE · Live model run");
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/demo/model/analyze?model=graphsage&example=incoming-collection",
+    expect.objectContaining({ method: "POST" }),
+  );
+  fireEvent.change(picker, { target: { value: "example:ordinary-payments" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Analysis model" }), {
+    target: { value: "graph_xgboost" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Run Graph XGBoost" }));
+  await waitFor(() =>
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/demo/model/analyze?model=graph_xgboost&example=ordinary-payments",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+});
+
+it("restores a valid saved example and falls back for a removed example", async () => {
+  sessionStorage.setItem(
+    "dolos:selection",
+    JSON.stringify("example:mixed-network"),
+  );
+  renderDemo(judgeDemo);
+  expect(screen.getByRole("heading", { name: "Mixed network" })).toBeTruthy();
+  cleanup();
+  sessionStorage.setItem("dolos:selection", JSON.stringify("example:retired"));
+  renderDemo(judgeDemo);
+  await waitFor(() =>
+    expect(
+      (
+        screen.getByRole("combobox", {
+          name: "Choose investigation",
+        }) as HTMLSelectElement
+      ).value,
+    ).toBe("demo"),
+  );
+  expect(
+    screen.getByRole("heading", { name: "The pass-through network" }),
+  ).toBeTruthy();
+});
+it("rejects live scores for a different example instead of displaying them", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ...demo.models.graphsage,
+            scores: demo.models.graphsage.scores.map((score) => ({
+              ...score,
+              transaction_id: "another-example:1",
+            })),
+          }),
+        ),
+    ),
+  );
+  renderDemo();
+  fireEvent.click(screen.getByRole("button", { name: "Run GraphSAGE" }));
+  await screen.findByText(
+    "The API and this example do not match. Deploy the API and frontend from the same revision, then reload.",
+  );
+  expect(screen.queryByText("GraphSAGE · Live model run")).toBeNull();
 });
 it("preserves selected documents when navigating away and reopening uploads", () => {
   renderDemo();

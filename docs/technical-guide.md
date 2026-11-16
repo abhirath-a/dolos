@@ -1,0 +1,242 @@
+# Technical guide
+
+A FastAPI service built from `dolos.ipynb`, with durable batch ingestion, a separate worker, and a directed transaction multigraph. The API runs without the large ML dependencies. The notebook remains available; `dolos/model.py` extracts its feature construction, models, metrics, and training pipeline without running notebook cells at import.
+
+Turso (`libsql`), R2 (`boto3`), and inference dependencies (`numpy` and native XGBoost) are base runtime dependencies so Vercel's default Python installation includes them. Linux x86-64 uses the small `xgboost-cpu` wheel. GraphSAGE evaluates exported `.npz` tensors with NumPy using the same shared history features as training; PyTorch, PyG, Polars and scikit-learn are only needed for training via the optional `ml` extra. The `turso` and `r2` extras remain compatible with existing commands. Deploy `pyproject.toml`, `uv.lock`, source and packaged artifacts together; reset the Vercel API install override to its default and rebuild without the previous cache. PDF extraction remains optional on the API and is installed on the worker.
+
+## React frontend
+
+The Evidence Desk app in `frontend/` opens directly into a genuine GraphSAGE teaching demonstration. The graph has a charcoal canvas, paper evidence inspector, pinned model context, and paginated ledger. Historical reconstructions remain archived in the API/data, but are excluded from the model example picker because they lack canonical transaction fields. Uploads support background batch progress, cancellation and retained successful batches.
+
+```sh
+nix develop
+uv sync --extra test --extra r2 --extra pdf-llm
+uv run uvicorn dolos.api:app --reload
+# Another Nix shell:
+cd frontend
+pnpm install --frozen-lockfile
+pnpm dev
+# Another Nix shell, repository root:
+uv run python -m dolos.worker
+```
+
+Open http://localhost:5173. Build with `pnpm build`, then serve frontend and API together using `uv run uvicorn dolos.web:app` at port 8000. The original `dolos.api:app` API remains available unchanged.
+
+The bundled demo uses explicitly labeled synthetic teaching data, not IBM data or real bank statements. Analyze always recomputes GraphSAGE or Graph XGBoost on the server; recorded predictions are never substituted on failure. Matching source data, manifests and trained weights are shipped under `dolos/demo_assets/`. Default runtime dependencies enable live inference without the training extra. To regenerate the source, frontend fixture and packaged weights together, run `uv run --extra ml python -m dolos.model_demo`. Uploaded canonical transactions use separate configured `DOLOS_MODEL_DIR` artifacts. For the generated synthetic upload pack only, point it to `dolos/demo_assets/artifacts`; this teaching model does not establish real-world accuracy. See [the video runbook](video-demo.md).
+
+`POST /analyze` accepts a historical `case_id` or uploaded `batch_ids`, visible `edge_ids`, and a model. `/graph` supports inclusive `after` and exclusive `before` date windows. Historical evidence review, partial-PDF pattern checks, and actual trained-model inference remain distinct. Export and the ledger disclose their visible scope.
+
+## Run locally
+
+```sh
+nix develop
+uv sync --extra test --extra r2 --extra pdf-llm
+uv run python -m dolos.migrate
+uv run uvicorn dolos.api:app --host 127.0.0.1 --port 8000
+```
+
+In another Nix development shell, start a worker:
+
+```sh
+uv run dolos-worker
+# Process at most one document and exit:
+uv run dolos-worker --once
+```
+
+Database and upload storage are configured independently. `DOLOS_DATABASE_URL` defaults to `file:./var/dolos.sqlite3`; `DOLOS_DATA_DIR` defaults to `./data` and holds uploads under `data/uploads`. API and workers must use the same database URL and storage configuration. Local storage requires shared uploaded files; R2 allows separate machines without a shared filesystem. SQLite uses WAL locally; remote libSQL/Turso connections go directly to the primary. Multiple workers can claim work against the same database. Jobs are claimed atomically, have five-minute leases renewed every 30 seconds while processing, and are reclaimed after worker crashes (three attempts maximum). Lease tokens fence stale worker results. Document rows and terminal job status commit together. Parser failures roll back the whole document; row validation failures preserve valid rows and mark the document `needs_review`. Failed documents can be retried explicitly.
+
+Open <http://127.0.0.1:8000/docs> for interactive API documentation.
+
+## Database configuration and migrations
+
+The application uses one database for uploaded transactions, extracted relations, and historical cases. `data/` contains uploads only; the default database lives separately at `var/dolos.sqlite3`. To put the database elsewhere, set an absolute file URL:
+
+```sh
+export DOLOS_DATABASE_URL='file:/absolute/path/dolos.sqlite3'
+export DOLOS_DATA_DIR='./data'
+python -m dolos.migrate
+```
+
+For a **libSQL-backed Turso** database:
+
+```sh
+uv sync --extra turso
+export TURSO_DATABASE_URL='libsql://your-database.turso.io'
+export TURSO_AUTH_TOKEN='your-database-token'
+# Leave DOLOS_DATABASE_URL unset to use TURSO_DATABASE_URL.
+python -m dolos.migrate
+uvicorn dolos.api:app --host 127.0.0.1 --port 8000
+```
+
+Use the same environment in the worker terminal. `DOLOS_DATABASE_URL` takes precedence over `TURSO_DATABASE_URL`. Remote URLs select the `libsql` driver automatically; local files use Python SQLite by default. `DOLOS_DATABASE_DRIVER=libsql` also supports a local file for driver testing. The optional native driver may require a Rust/CMake toolchain when no wheel exists for your Python/platform. This integration targets Turso's libSQL engine, not its separate `turso://` database-engine driver. See [Turso's Python connection documentation](https://docs.turso.tech/sdk/python/quickstart).
+
+`python -m dolos.migrate` (or `dolos-migrate` after reinstalling) applies ordered migrations:
+
+1. `0001_initial.sql`: creates the schema; safely adopts the existing schema with `CREATE ... IF NOT EXISTS`.
+2. `0002_famous_cases.json`: inserts the six cited case graphs into the same relations table.
+3. `0003_object_storage.sql`: records document object locations and direct-upload sessions.
+
+Each migration and its `schema_migrations` ledger record commit in one transaction. Checksums detect edits to already-applied migration files. Repeated or concurrent migration runs do not duplicate the data. Add a new migration instead of editing an applied snapshot. API/worker startup applies schema migrations without installing demo data; apply all migrations explicitly before deployment. No LLM calls or provider keys are needed for migrations.
+
+Existing installations can point `DOLOS_DATABASE_URL` at their old database file before running migrations; existing uploaded rows are retained. Changing a database URL selects another database—it does not upload an old local file to Turso. Uploaded PDFs/CSVs remain separate from the database. Use R2 below to share them between API and worker hosts.
+
+## Cloudflare R2 setup
+
+1. In the Cloudflare dashboard, enable **R2 Object Storage** and create a bucket such as `dolos-statements`. Use the default jurisdiction (this integration uses the standard account endpoint). Leave public access disabled.
+2. Under R2 **Account Details → API Tokens → Manage**, create a temporary **Admin Read & Write** token for bucket configuration. Save its **Access Key ID**, **Secret Access Key**, and your account ID. These are R2 S3 credentials, not a general Cloudflare API token. See [Cloudflare authentication instructions](https://developers.cloudflare.com/r2/api/tokens/).
+3. Install the extra and export the following variables in your setup terminal. Replace placeholders locally; never put secrets in frontend variables or commit them. `.env.example` documents the settings, but `.env` files are not automatically loaded.
+
+```bash
+uv sync --extra r2
+export DOLOS_STORAGE_BACKEND=r2
+export R2_ACCOUNT_ID='YOUR_ACCOUNT_ID'
+export R2_BUCKET_NAME='dolos-statements'
+export R2_ACCESS_KEY_ID='YOUR_ACCESS_KEY_ID'
+export R2_SECRET_ACCESS_KEY='YOUR_SECRET_ACCESS_KEY'
+uv run python -m dolos.storage_setup --origin http://localhost:3000 --origin https://your-app.vercel.app
+```
+
+Replace the origins with your actual frontend URLs, without trailing slashes. This replaces the bucket CORS configuration with PUT access for those origins and adds a one-day cleanup rule for `dolos/incoming/` staging objects, preserving other lifecycle rules. It does not enable public access. Alternatively, add `--create-bucket` to create a missing bucket.
+
+4. Create an **Object Read & Write** token scoped to this bucket for runtime use. Put that token's access key and secret, plus `DOLOS_STORAGE_BACKEND`, `R2_ACCOUNT_ID`, and `R2_BUCKET_NAME`, in both the API and worker environments. Use the same database configuration on both. Remove the temporary admin credentials from runtime environments. Check access and apply database migrations:
+
+```bash
+uv run python -m dolos.storage_setup --check
+uv run python -m dolos.migrate
+```
+
+5. If you already have local uploads, run the following from the machine that has them, with the original `DOLOS_DATA_DIR` and database configured. It copies files, updates their database locations, and retains local originals:
+
+```bash
+uv run python -m dolos.storage_setup --migrate-local
+```
+
+The backfill command also configures the staging lifecycle, so run it with setup/admin credentials before switching to the runtime token. Historical demo graphs have no uploaded files to move.
+
+For direct browser uploads, compute each file's SHA-256, then POST `/uploads/presign` with `{"files":[{"filename":"statement.pdf","size":12345,"sha256":"64 lowercase hex characters"}]}`. PUT each file to its returned URL using the returned headers, then POST the returned `complete_url`. Poll `/batches/{batch_id}` afterward. Include your API bearer token on API requests if configured; do not send it to R2. Let the browser set Content-Length.
+
+URLs expire after 15 minutes. Limits are 25 MiB per file and 100 MiB per batch. Completion downloads and verifies all files before publishing jobs, then copies verified bytes into final object keys that upload URLs cannot overwrite. Workers download into temporary files. Direct uploads bypass the API's incoming file-body size limit, but completion still uses bounded backend disk and I/O. Existing multipart `/batches` uploads also work with R2. See [presigned URLs](https://developers.cloudflare.com/r2/api/s3/presigned-urls/) and [browser CORS](https://developers.cloudflare.com/r2/buckets/cors/).
+
+## Upload and inspect
+
+```sh
+curl -F 'files=@examples/statement.csv' http://127.0.0.1:8000/batches
+# Use the returned batch id:
+curl http://127.0.0.1:8000/batches/BATCH_ID
+curl http://127.0.0.1:8000/graph
+curl 'http://127.0.0.1:8000/transactions?limit=100&offset=0'
+curl http://127.0.0.1:8000/documents/DOCUMENT_ID/errors
+curl -X POST http://127.0.0.1:8000/documents/DOCUMENT_ID/retry
+```
+
+Repeat `-F 'files=@...'` to submit a batch of statements. Submit many batches while workers drain the queue. Limits: 100 files, 25 MiB per file, 100 MiB per batch. Processing is asynchronous; HTTP 202 means queued, not processed. Exact file content is deduplicated across batches. Original repeated rows remain distinct edges. Transfers duplicated in different exports are retained: automatic cross-statement matching could incorrectly merge real repeated payments. Each transaction retains its document id and one-based data row number.
+
+`GET /graph` returns `nodes` and individual directed `edges` from both canonical transactions and PDF relations. `summaries` aggregates canonical transfers by both currencies; `relation_summaries` aggregates PDF relations by their stated currency and reports how many amounts are known. Canonical account identities preserve leading zeros and use JSON `[bank,account]` strings as collision-safe node ids. Amounts are decimal strings; currencies are never added together. `account` (node id), `batch_id`, and exclusive `before` filters apply to `/graph`, `/relations`, and `/transactions`. Relations with unknown dates are included normally but excluded by `before` filters. `/relations` returns the extracted PDF relation records; `/transactions` remains the fully specified canonical data used by the notebook models. Use `has_more` and `next_offset` for pagination. Graph summaries cover the returned page, not the full database. Pages can shift as workers ingest documents.
+
+## Statement formats
+
+See `examples/statement.csv` or `GET /statement-schema`. Required fields:
+
+```text
+timestamp,from_bank,from_account,to_bank,to_account,amount_received,receiving_currency,amount_paid,payment_currency,payment_format
+```
+
+Optional `reference` is retained. Amounts are nonnegative, at most 1e18, with up to 18 fractional digits and 38 significant digits. JSON accepts an array of transaction objects or `{"transactions": [...]}`. Identifiers must be strings to preserve leading zeros. ISO 8601 timestamps are normalized to UTC; timestamps without an offset are assumed UTC. Original IBM HI-Small CSVs with duplicate `Account` headers and `YYYY/MM/DD HH:MM` timestamps are supported. Labels from IBM files are ignored during ingestion.
+
+## Flexible PDF statements → relation graph
+
+Install the extraction dependency and configure the **worker** environment:
+
+```sh
+uv sync --extra pdf-llm
+export OPENROUTER_API_KEY='your-api-key'
+export DOLOS_PDF_PROVIDER='openrouter'
+export DOLOS_PDF_MODEL='openrouter/free'
+export DOLOS_PDF_MODE='text'  # Default: local text first, vision for scans
+# Restart/start workers with this environment:
+uv run dolos-worker
+```
+
+Upload PDFs through the existing batch endpoint:
+
+```sh
+curl -F 'files=@bank-statement.pdf' http://127.0.0.1:8000/batches
+curl 'http://127.0.0.1:8000/graph?batch_id=BATCH_ID'
+curl 'http://127.0.0.1:8000/relations?batch_id=BATCH_ID'
+```
+
+No bank-specific column template is needed. The default is OpenRouter's `openrouter/free`, which routes across available **free** models, filtering for vision and structured outputs as needed. This removes the hard dependency on OpenAI-hosted inference. The Python `openai` package is used only as a compatible API client. See the [free router documentation](https://openrouter.ai/docs/guides/routing/routers/free-router) and [structured output documentation](https://openrouter.ai/docs/guides/features/structured-outputs).
+
+Cost controls:
+
+- Locally extract PDF text first; this avoids image tokens when the text is readable. Set `DOLOS_PDF_MODE=direct` to always use visual extraction when text order/layout is poor.
+- For scans or mixed PDFs with insufficient text, render pages locally to PNGs and send them to a free vision model. Rendering is capped at 144 DPI / 2000 pixels on the longest edge. No remote PDF-parser/OCR plugin is used, so no hosted per-page parsing charge is added. No local OCR installation is required.
+- Default requests stay on the free router. Quota/rate-limit failures remain visible job failures; the application does not switch to paid models. Free availability, quality, and throughput vary; check your [OpenRouter limits](https://openrouter.ai/docs/api/reference/limits) before submitting large batches. Existing document deduplication avoids repeat extraction of identical successful uploads.
+- Requests require schema support and use price-sorted provider routing. Model changes are explicit via `DOLOS_PDF_MODEL`; each relation records the requested route and resolved model.
+
+Free token inference is the lowest API token price, but local compute and storage still have costs. For higher-volume **text-only** extraction, an inexpensive paid alternative is `mistralai/mistral-nemo`, listed at $0.029 / $0.030 per million input/output tokens in the [OpenRouter model catalog](https://openrouter.ai/api/v1/models) on 2026-11-15. A 10,000-input / 5,000-output token request at those listed rates is about $0.00044, excluding any provider/account fees. It is text-only: use a vision-capable model for scanned statements. Pricing and endpoints can change; the free router remains the default and there is no automatic paid upgrade.
+
+Direct OpenAI remains available explicitly:
+
+```sh
+export DOLOS_PDF_PROVIDER=openai
+export OPENAI_API_KEY='your-api-key'
+export DOLOS_PDF_MODEL=gpt-4o-mini
+```
+
+With that provider, direct mode sends PDF chunks through the [OpenAI file-input API](https://developers.openai.com/api/docs/guides/file-inputs). Changing providers never reuses another provider's API key. A paid model override incurs that model's charges.
+
+The extractor identifies the statement owner and converts debits/credits and narrative descriptions into sender → receiver relations. For a statement owned by B, “transfer to A” gives **B → A**; “received from C” gives **C → B**. Names alone are enough for nodes. Amount, currency, and date are optional and remain `null` when absent; no account numbers, dates, amounts, or currencies are fabricated to satisfy the AML schema. Date-only entries carry `timestamp_precision="date"` (UTC midnight represents that date, not an observed time). Every edge retains a one-based original PDF page, quoted evidence, description/reference, extraction model/mode, confidence, and review reasons. LLM quotes and confidence are model-produced and unverified, not proof of correctness. The prompt ignores document instructions and excludes balances/subtotals from transfers.
+
+Party identity rules:
+
+- Full bank + account strings link to canonical transaction nodes with the same identifiers.
+- Name-only parties use case/whitespace/Unicode-normalized names as candidate links across documents. Nodes are marked provisional: two people with the same name may be conflated, and name-only nodes are not automatically merged with known accounts.
+- When an account is masked or lacks its bank, an explicit party name provides the provisional name link instead. Without a name, these account identifiers are scoped to their document, avoiding global merges of unrelated `****1234` accounts.
+- Transfers without an identifiable sender or receiver get row errors. Ambiguous direction, provisional identities, and missing fields mark extracted relations for review; these edges remain visible in the graph.
+
+The worker extracts three target pages per request with the first page and adjacent pages as context. It instructs the model to emit only transactions starting on target pages, preserving individual repeated payments. All chunks must finish before any graph rows commit. Refusals, incomplete/truncated output, or invalid page attribution fail the document visibly; valid rows alongside row-level validation errors are stored with `needs_review`. A failed document can use the existing retry endpoint. Long calls renew the queue lease; crashed workers remain recoverable. Encrypted PDFs and PDFs over 200 pages are rejected. Canonical CSV-table text PDFs still use the deterministic parser without an API call.
+
+Flexible PDF extraction sends statement text/page images to OpenRouter and its selected inference provider by default (or OpenAI when explicitly selected). Review the selected provider's data-handling settings for your deployment. Requests use `store=False`; no Files API uploads are created. This flag does not establish a third-party retention policy. A worker without a key fails with setup guidance, and CSV/JSON ingestion keeps working. No live provider call is made by the test suite. Extraction quality and completeness still require evaluation on your actual bank layouts. PDF relations feed the graph directly; they are not automatically passed to AML scoring because they can lack the required transaction fields.
+
+## Famous historical case demos
+
+A source-linked dataset includes Al Capone, 1MDB, HSBC, Liberty Reserve, OneCoin, and Bitfinex: 33 entities and 29 relationships. Each edge preserves citations, evidence status, and amount/date qualifiers. These are curated public-history graphs, not fabricated bank statements or training labels. See [the dataset guide and primary sources](../examples/famous-cases.md).
+
+```sh
+uv run python -m dolos.migrate
+uv run uvicorn dolos.api:app --host 127.0.0.1 --port 8000
+```
+
+Read `/demo/cases` for case cards and sourced metrics, `/demo/cases/1mdb` for one complete case, and `/graph` for loaded relationships. Cases are installed by migration 0002 in the main database and retain dataset/case metadata to distinguish them from uploaded statements. The old `dolos-demo` command delegates to migrations; `--list` still lists bundled cases without writing. Loading requires no LLM or worker. Historical edge amounts are excluded from transaction summaries to avoid adding overlapping flows and aggregates.
+
+## Train and serve the notebook models
+
+Only synthetic teaching-model weights are included in the repository. For a separately trained model, install training dependencies, obtain the IBM training dataset, and export a fresh artifact directory:
+
+```sh
+uv sync --extra ml
+dolos-train HI-Small_Trans.csv artifacts/run-1 --epochs 6
+export DOLOS_MODEL_DIR="$PWD/artifacts/run-1"
+curl 'http://127.0.0.1:8000/scores?model=graph_xgboost&limit=100'
+```
+
+Set `DOLOS_MODEL_DIR` in the API process environment before starting it. On macOS, XGBoost requires the OpenMP runtime. The CLI runs the notebook's complete benchmark, including both XGBoost and GraphSAGE variants, and exports weights plus a manifest with frozen training vocabularies. Existing old notebook artifacts lack those vocabularies and must be retrained. Training creates a new output directory; it never overwrites a run.
+
+`GET /scores` supports `graph_xgboost`, `transaction_xgboost`, `graphsage`, and `graphsage_no_neighbors`. It uses the imported graph history, frozen training vocabularies (unknown categories get code zero), and the notebook's hourly cutoff at both graph hops. The imported history should include relevant earlier transactions; training data is not automatically loaded as serving history. Only transfers at or after the artifact's model-selection cutoff are eligible. It scores the latest `limit` eligible transfers and ranks that set by raw margin. Scores are review rankings, not calibrated probabilities. Training on synthetic IBM data does not establish performance on real bank statements.
+
+Scoring is synchronous and capped at 100,000 history rows to bound memory; larger histories fail explicitly rather than silently dropping context. The API returns 503 when weights or ML dependencies are unavailable. Batch ingestion and graph retrieval continue without a model.
+
+## Tests and deployment scope
+
+```sh
+pytest -q
+```
+
+Tests cover upload → queue → worker → graph, repeated rows, file deduplication, malformed rows/files, JSON and IBM input, exclusive claims, lease recovery, pagination, precise decimal aggregation, stale-worker fencing, and bearer authentication. PDF tests cover free-router defaults and endpoint/key isolation, price routing, quota errors without paid fallback, local scan rendering, direct PDF requests, text mode and scan fallback, page chunking, original-page provenance, missing fields, identity rules, provider refusal, and whole-document rollback on later chunk failures using mocked provider responses. Migration tests cover existing data preservation, rollback/resume, concurrency, checksum enforcement, independent storage paths, and the libSQL adapter. The native-driver test runs when `libsql` is installed; live Turso credentials are not required by the tests. An optional ML test trains a small synthetic fixture and checks serving parity for all four models plus future exclusion; it runs when ML dependencies are installed.
+
+The database can run locally or on libSQL/Turso. For multi-host deployment, configure R2 or shared storage for uploaded files; a remote database alone does not share uploads. For high volume, add resource limits for untrusted PDF parsing and provider rate/cost controls, batch database writes, and run inference separately. Each document commits atomically; large commits can delay other writes or exceed remote transaction limits. Upload size limits apply after multipart parsing, so configure an upstream request-body limit as well. This version does not provide tenancy, retention/deletion policies, audit logging, or encryption management.
+
+Set `DOLOS_API_KEY` to require `Authorization: Bearer <key>` for API routes. Default local mode has no authentication; keep it bound to loopback. Interactive docs remain accessible. Use TLS and appropriate storage permissions before processing sensitive statements on a shared deployment.
+
+Implementation references: [FastAPI file uploads](https://fastapi.tiangolo.com/tutorial/request-files/) and [Python SQLite transactions](https://docs.python.org/3/library/sqlite3.html).
