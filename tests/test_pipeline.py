@@ -183,3 +183,20 @@ def test_heartbeat_keeps_long_extraction_leased(setup, monkeypatch):
     monkeypatch.setattr(worker, 'parse_document', slow_parse)
     assert process_one(store)
     assert len(client.get('/graph').json()['edges']) == 3
+
+
+def test_unexpected_parser_failure_reports_stage_without_source_data(setup, monkeypatch):
+    client, store = setup
+    from dolos import worker
+    batch = upload(client)
+
+    def fail_parse(*args):
+        raise RuntimeError('private statement text and account details')
+
+    monkeypatch.setattr(worker, 'parse_document', fail_parse)
+    assert process_one(store)
+    document = client.get('/batches/' + batch['id']).json()['documents'][0]
+    assert document['status'] == 'failed'
+    assert 'parsing document (RuntimeError)' in document['error']
+    assert 'private statement' not in document['error']
+    assert client.get('/graph').json()['edges'] == []

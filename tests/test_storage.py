@@ -113,6 +113,26 @@ def test_multipart_r2_and_worker_on_another_filesystem(setup, tmp_path):
     assert not process_one(worker_store)
 
 
+def test_r2_reupload_repairs_missing_local_document(setup, tmp_path, monkeypatch):
+    client, store, fake = setup
+    monkeypatch.setenv('DOLOS_STORAGE_BACKEND', 'local')
+    first = client.post('/batches', files={'files': ('statement.csv', sample())}).json()
+    document_id = first['documents'][0]['id']
+    worker_store = Store(tmp_path / 'another-host')
+    assert process_one(worker_store)
+    failed = client.get('/batches/' + first['id']).json()['documents'][0]
+    assert failed['status'] == 'failed'
+    assert 'local storage' in failed['error']
+    monkeypatch.setenv('DOLOS_STORAGE_BACKEND', 'r2')
+    repaired = client.post('/batches', files={'files': ('statement.csv', sample())}).json()
+    assert repaired['documents'][0]['id'] == document_id
+    assert repaired['documents'][0]['status'] == 'queued'
+    assert store.object_location(document_id)['backend'] == 'r2'
+    assert process_one(worker_store)
+    assert client.get('/batches/' + first['id']).json()['documents'][0]['status'] == 'completed'
+    assert len(client.get('/graph').json()['edges']) == 3
+
+
 def test_direct_upload_finalize_idempotency_and_staging_replay(setup, tmp_path):
     client, store, fake = setup
     signed = presign(client)

@@ -64,10 +64,12 @@ def process_one(store):
         return False
     # Spool before taking the database write lock. A failed parser never leaves partial edges.
     import tempfile
+    stage = 'loading document storage'
     try:
         location = store.object_location(job['id'])
         storage = storage_for(store.root, location['backend'] if location else 'local')
         with heartbeat(store, job), storage.materialize(location, job['sha256'], job['suffix']) as path, tempfile.TemporaryFile(mode='w+t', encoding='utf-8') as staged:
+            stage = 'parsing document'
             accepted = rejected = 0
             review_required = False
             for index, row, error in parse_document(path, job['suffix']):
@@ -78,6 +80,7 @@ def process_one(store):
             if not accepted and not rejected:
                 raise DocumentError('Statement contains no transaction rows.')
             staged.seek(0)
+            stage = 'saving extracted relationships'
             with store.connect() as db:
                 db.execute('BEGIN IMMEDIATE')
                 current = db.execute('SELECT token,status FROM documents WHERE id=?', (job['id'],)).fetchone()
@@ -97,9 +100,11 @@ def process_one(store):
                     WHERE id=? AND token=?''', ('needs_review' if rejected or review_required else 'completed',
                                               accepted, rejected, job['id'], job['token']))
     except Exception as exc:
-        log.exception('Document processing failed: %s', job['id'])
+        log.exception('Document processing failed: %s (%s)', job['id'], stage)
         # No source text or account data is returned in public diagnostics.
-        error = str(exc) if isinstance(exc, (DocumentError, StorageError)) else 'Parser failed; check encoding/format and worker logs.'
+        error = str(exc) if isinstance(exc, (DocumentError, StorageError)) else (
+            f'Document processing failed while {stage} ({type(exc).__name__}). '
+            'Check the Railway worker traceback for this document; retry after fixing the cause.')
         with store.connect() as db:
             db.execute("""UPDATE documents SET status='failed',error=?,lease_until=NULL
                 WHERE id=? AND token=? AND status='processing'""", (error, job['id'], job['token']))

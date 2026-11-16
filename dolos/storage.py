@@ -67,6 +67,9 @@ class LocalStorage:
         if Path(key).name != key:
             raise StorageError('Invalid local document key.')
         path = self.directory / key
+        if not path.is_file():
+            raise StorageError('Original document is missing from local storage. For separate API and worker hosts, '
+                               'set DOLOS_STORAGE_BACKEND=r2 on both and re-upload the original file to repair its storage reference.')
         validate_file(path, sha256, location['byte_size'] if location else None)
         yield path
 

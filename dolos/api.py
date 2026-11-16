@@ -55,12 +55,22 @@ def publish_batch(store, batch_id, prepared, direct=False):
                 session = db.execute('SELECT status FROM upload_sessions WHERE id=?', (item['id'],)).fetchone()
                 if session['status'] == 'completed':
                     continue  # Another completion request already published this session.
-            existing = db.execute('SELECT id FROM documents WHERE sha256=?', (item['sha256'],)).fetchone()
+            existing = db.execute('SELECT id,status FROM documents WHERE sha256=?', (item['sha256'],)).fetchone()
             document_id = existing['id'] if existing else uuid.uuid4().hex
             if not existing:
                 db.execute("""INSERT INTO documents(id,batch_id,filename,sha256,suffix,status)
                     VALUES(?,?,?,?,?,'queued')""", (document_id, batch_id, item['filename'], item['sha256'], item['suffix']))
                 store.record_object(db, document_id, item['location'])
+            elif item['location']['backend'] == 'r2':
+                previous = db.execute('SELECT backend FROM document_objects WHERE document_id=?', (document_id,)).fetchone()
+                if previous is None or previous['backend'] == 'local':
+                    # A verified re-upload repairs legacy machine-local references.
+                    # Retain identity/results; fence a worker using the old location.
+                    db.execute('DELETE FROM document_objects WHERE document_id=?', (document_id,))
+                    store.record_object(db, document_id, item['location'])
+                    if existing['status'] in {'failed', 'processing', 'queued'}:
+                        db.execute("""UPDATE documents SET status='queued',attempts=0,error=NULL,
+                            token=NULL,lease_until=NULL WHERE id=?""", (document_id,))
             db.execute('INSERT OR IGNORE INTO batch_documents VALUES(?,?)', (batch_id, document_id))
             if direct:
                 db.execute("UPDATE upload_sessions SET status='completed',document_id=? WHERE id=?", (document_id, item['id']))
