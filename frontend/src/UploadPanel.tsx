@@ -63,10 +63,7 @@ export default function UploadPanel({
             </span>
             <strong>Drop files here</strong>
             <span>or browse files</span>
-            <small>
-              PDF, CSV, JSON · 25 MiB per file · large selections split
-              automatically
-            </small>
+            <small>CSV or JSON · 25 MiB per file · large selections split automatically</small>
           </button>
           <input
             ref={input}
@@ -138,11 +135,8 @@ export default function UploadPanel({
               />
               <span>
                 {upload.completed} of {groups} batches accepted ·{" "}
-                {Math.min(
-                  100,
-                  Math.round((upload.transferred / Math.max(total, 1)) * 100),
-                )}
-                % transferred
+                {Math.min(100, Math.round((upload.transferred / Math.max(total, 1)) * 100))}%
+                transferred
               </span>
             </div>
           )}
@@ -159,9 +153,7 @@ export default function UploadPanel({
                 onClick={upload.start}
               >
                 <Upload size={16} />
-                {upload.completed
-                  ? "Resume remaining batches"
-                  : "Upload & build graph"}
+                {upload.completed ? "Resume remaining batches" : "Upload & build graph"}
               </button>
             )}
             {upload.completed > 0 && (
@@ -172,9 +164,8 @@ export default function UploadPanel({
             )}
           </div>
           <p className="upload-note">
-            You can leave this page while uploads continue. Cancelling stops
-            remaining uploads; statements already accepted can continue
-            processing.
+            You can leave this page while uploads continue. Cancelling stops remaining uploads;
+            statements already accepted can continue processing.
           </p>
           {accepted.length > 0 && (
             <section className="document-list">
@@ -185,8 +176,7 @@ export default function UploadPanel({
                   <div>
                     <strong>{d.filename}</strong>
                     <span>
-                      {d.accepted} accepted relationships · {d.rejected}{" "}
-                      rejected rows
+                      {d.accepted} accepted relationships · {d.rejected} rejected rows
                     </span>
                     {d.error && <p className="document-error">{d.error}</p>}
                     <div className="document-actions">
@@ -197,15 +187,11 @@ export default function UploadPanel({
                         </button>
                       )}
                       {d.rejected > 0 && (
-                        <button onClick={() => onErrors(d.id)}>
-                          Review rejected rows
-                        </button>
+                        <button onClick={() => onErrors(d.id)}>Review rejected rows</button>
                       )}
                     </div>
                   </div>
-                  <span
-                    className={`status-tag ${d.status === "failed" ? "review" : ""}`}
-                  >
+                  <span className={`status-tag ${d.status === "failed" ? "review" : ""}`}>
                     {human(d.status)}
                   </span>
                 </div>
@@ -214,34 +200,21 @@ export default function UploadPanel({
           )}
         </section>
         <div className="upload-help">
-          <p className="provider-note">
-            Ordinary PDFs use your configured extraction provider. PDFs with an
-            embedded transaction export use that export instead.
-          </p>
-          <p className="provider-note">
-            <a href="/dolos-video-statements.zip" download>
-              Download synthetic video statements
-            </a>{" "}
-            — four PDFs with 1,200 transactions. Upload the PDFs or their CSV
-            companions, not both. These test model behavior, not real-world
-            accuracy.
-          </p>
+          <p className="provider-note">Ordinary CSVs use your configured extraction provider. </p>
           <details>
             <summary>What happens to my documents?</summary>
             <p>
-              Uploaded files stay in your configured storage. PDF text or page
-              images may be sent to your configured extraction provider. No
-              public file links are created. Retention and provider settings
-              depend on your deployment.
+              Uploaded files stay in your configured storage. CSV text or page images may be sent to
+              your configured extraction provider. No public file links are created. Retention and
+              provider settings depend on your deployment.
             </p>
           </details>
           <details>
             <summary>CSV and JSON format</summary>
             <p>
-              CSV requires timestamp, from_bank, from_account, to_bank,
-              to_account, amount_received, receiving_currency, amount_paid,
-              payment_currency, payment_format. JSON accepts an array of the
-              same fields.
+              CSV requires timestamp, from_bank, from_account, to_bank, to_account, amount_received,
+              receiving_currency, amount_paid, payment_currency, payment_format. JSON accepts an
+              array of the same fields.
             </p>
             <a href="/sample-statement.csv" download>
               Download a sample CSV

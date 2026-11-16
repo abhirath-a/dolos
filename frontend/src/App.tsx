@@ -32,6 +32,7 @@ import {
 } from "./types";
 import Inspector, { type InspectorTab } from "./Inspector";
 import Ledger from "./Ledger";
+import Help from "./Help";
 import UploadPanel from "./UploadPanel";
 import { useUpload } from "./useUpload";
 const Network = lazy(() => import("./Network"));
@@ -594,6 +595,7 @@ export default function App() {
           </button>
         )}
         <div className="header-navigation">
+          <Help />
           <button
             onClick={() =>
               setView(view === "workspace" ? "about" : "workspace")
@@ -704,7 +706,10 @@ export default function App() {
             <>
               <div className="workspace-heading">
                 <div>
-                  <h1>The anti-money laundering & unauthorized transactions model of tomorrow.</h1>
+                  <h1>
+                    The anti-money laundering & unauthorized transactions model
+                    of tomorrow.
+                  </h1>
                   <div className="workspace-description">
                     <span
                       className={`dataset-tag ${mode === "demo" ? "synthetic" : ""}`}

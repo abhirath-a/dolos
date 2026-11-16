@@ -203,7 +203,7 @@ svg {
   display: flex;
   align-items: center;
   background: #d9e4ff;
-  padding:  40px;
+  padding: 40px;
   gap: 25px;
 }
 .app-shell {
@@ -276,7 +276,7 @@ svg {
   height: 100%;
   gap: 26px;
 }
-.header-navigation button {
+.header-navigation > button {
   height: 100%;
   display: flex;
   align-items: center;
@@ -2377,7 +2377,7 @@ th,
     gap: 16px;
     margin-left: auto;
   }
-  .header-navigation button {
+  .header-navigation > button {
     font-size: 10px;
   }
   .shell-body {
@@ -2767,6 +2767,90 @@ th,
 }
 
 /* Keep the investigation usable on short laptops and narrow screens. */
+.header-navigation > .header-help-link {
+  color: #344b71;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.header-help-link:hover {
+  color: #a52c2c;
+}
+body:has(.help-dialog[open]) {
+  overflow: hidden;
+}
+.help-dialog {
+  position: fixed;
+  margin: auto;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(24px, 5vw, 40px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: #202a35;
+  text-align: left;
+}
+.help-dialog::backdrop {
+  background: #101c2bbd;
+}
+.help-dialog .help-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.help-dialog h2 {
+  padding-right: 20px;
+  font:
+    750 clamp(24px, 5vw, 32px)/1.2 "Manrope Variable",
+    sans-serif;
+  color: #a52c2c;
+  letter-spacing: -0.03em;
+}
+.help-intro {
+  margin-top: 12px;
+  color: #526176;
+  line-height: 1.6;
+}
+.help-steps {
+  padding-left: 20px;
+  margin: 28px 0;
+}
+.help-steps li {
+  padding-left: 7px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.help-steps li::marker {
+  color: #a52c2c;
+  font-weight: 700;
+}
+.help-steps p {
+  margin-top: 4px;
+  color: #526176;
+}
+.help-note {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-bottom: 22px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #526176;
+}
+@media (max-width: 760px) {
+  .header-navigation {
+    display: flex;
+  }
+  .header-navigation > button:not(.header-help-link) {
+    display: none;
+  }
+  .header-navigation > .header-help-link {
+    font-size: 12px;
+    min-height: 44px;
+  }
+}
 .desk {
   height: clamp(420px, 72dvh, 850px);
   min-height: 0;
