@@ -82,4 +82,6 @@ The [evaluation notebook](dolos.ipynb) compares two models on the same chronolog
 | Transaction-only XGBoost | 0.976999 | 0.980 |
 | GraphSAGE → XGBoost | 1.000000 | 1.000 |
 
-The training and test data came from the same generator. These results measure how well the models recognize the simulated patterns. Real-world accuracy remains unmeasured. Use Dolos scores to prioritize human review. A flag alone does not establish wrongdoing.
+The training and test data came from the same generator. These results measure how well the models recognize the simulated patterns. Real-world accuracy remains unmeasured. Use Dolos scores to prioritize human review. A flag alone does not establish wrongdoing. 
+
+This project does not provide financial advice, double check any statement with a reputable source before making a decision
