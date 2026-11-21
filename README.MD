@@ -1,52 +1,85 @@
 # Dolos
 
-**Track:** AI + Finance
+Dolos is a transaction review workspace. Import PDF, CSV, or JSON statements to see who paid whom, trace transfers through an account network, and prioritize records for human review. Select a transfer in the graph or ledger to see the source record and, when a model score is available, what contributed to it.
 
-**Team:** Abhirath Agasanakoppa and Timothy Vu
+![Dolos network with a flagged transfer selected and its model analysis open](docs/screenshots/dolos-network.png)
 
-[Live demo](https://dolos-web.vercel.app) · [Source code](https://github.com/abhirath-a/dolos) · [Evaluation notebook](dolos.ipynb) · [Sample statements](https://drive.google.com/drive/folders/1_wOnd3X4I4Ws3uKO-V3OOrPi05OkOCEL?usp=drive_link) · [Video](https://youtu.be/HR9kh6V0AYs)
+*The synthetic pass-through example highlights a transfer from Account 0003 to Account 0005. Dashed edges show earlier transfers used as model context.*
 
-**Dolos is a prototype for human review. Its scores do not constitute financial advice or evidence of wrongdoing.**
+## Try an investigation
 
-## The problem
+1. [Run Dolos locally](#run-locally) and choose **Pass-through network**.
+2. Click **Analyze network**. Select the highlighted transfer or find it in the transaction ledger.
+3. Open **Analysis** to inspect the decision margin and the contributions from account history and transaction fields. Open **Evidence** to see the amount, timestamp, and source row.
 
-When a small business's finance analyst reviews a set of statements for unusual transfers, a ledger shows each payment on its own. The analyst has to piece together which accounts repeatedly pass money to one another and decide which transfers to review first.
+![Evidence tab showing the selected transfer and its source CSV row](docs/screenshots/dolos-evidence.png)
 
-## What we built
+*The Evidence tab traces the selected USD 8,700 transfer to row 2847 in the synthetic source CSV.*
 
-Dolos takes PDF, CSV, or JSON statements and turns them into a directed graph of accounts and transfers. It ranks eligible transfers for review and lets the analyst inspect the account history the model used, see what raised or lowered the score, and return to the source record.
+To try ingestion, unzip the [sample statement bundle](frontend/public/dolos-video-statements.zip) and upload the four PDFs together. Their embedded CSV exports contain 1,200 synthetic transfers and require no extraction API key. For a smaller upload, use the [example CSV](examples/statement.csv).
 
-In the [live demo](https://dolos-web.vercel.app), choose **The pass-through network**, click **Analyze network**, and select the flagged transfer. To try ingestion, upload the four [sample PDFs](frontend/public/dolos-video-statements.zip) together. Their embedded CSV exports supply 1,200 synthetic transfers without an extraction API call.
+## Run locally
 
-## What we added
+Use [the repository's Nix development shell](flake.nix) for Rust, Node, pnpm, uv, and Poppler. Run the following commands from the repository root in separate terminals.
 
-Our own idea. We asked whether an account's incoming and outgoing payment history would improve transfer ranking. We built the graph view so a reviewer could inspect that history and the evidence behind a score in the same workflow.
+If the ONNX files are missing, export them from the included trained weights before starting the API. **Analyze network** requires these files.
 
-## How it works
+```sh
+nix develop --command uv run tools/export_onnx.py
+```
 
-We generated 2,880 labeled transfers with simulated routing patterns and ordinary payments. We validated the CSV rows, sorted them by time, and learned category codes on the training set. The chronological split used 2,016 training, 432 validation, and 432 test transfers. Each prediction uses graph history from before the target hour.
+**API**
 
-The baseline is XGBoost with transaction fields such as amount, currency, and payment format. The final model adds GraphSAGE embeddings that summarize both accounts' earlier incoming and outgoing transfers. We froze the encoder after validation and trained one XGBoost classifier on the combined features. TreeSHAP shows how the graph and transaction feature groups contributed to the final score.
+```sh
+nix develop --command cargo run --locked --release --manifest-path backend/Cargo.toml
+```
 
-## Results
+**Web app**
 
-Both models scored the same 432 held-out synthetic transfers, including 144 labeled routing transfers.
+```sh
+nix develop --command pnpm --dir frontend install --frozen-lockfile
+nix develop --command pnpm --dir frontend dev
+```
+
+Open <http://127.0.0.1:5173>. Vite proxies API calls to port 8000. Dolos uses SQLite and local file storage by default.
+
+The endpoint `/api/demo/model/status` reports whether live scoring is available.
+
+### Configuration
+
+Set API options as environment variables. The API does not load [.env.example](.env.example) automatically.
+
+| To | Set |
+| --- | --- |
+| Score uploaded transfers | `DOLOS_MODEL_DIR` to a compatible ONNX bundle. Use `dolos/demo_assets/artifacts` to score the synthetic sample bundle. |
+| Extract PDFs that lack an embedded export | `OPENROUTER_API_KEY` for the default provider, or the OpenAI settings in [.env.example](.env.example). |
+| Change where statements and rows are stored | Set the file storage and database options in [.env.example](.env.example). Local files and Cloudflare R2 are supported for uploads. SQLite and remote libSQL are supported for rows. |
+| Require API authentication | Set `DOLOS_API_KEY` for the API and the Vite proxy in development. In deployment, configure your authenticated reverse proxy to supply the bearer header. |
+
+### Run with Docker
+
+Build from the repository root. For live demo scoring, export any missing ONNX files before building. The image serves both the web app and the API at <http://127.0.0.1:8000>.
+
+```sh
+docker build -t dolos .
+docker run --rm -p 127.0.0.1:8000:8000 -v dolos-data:/app/data dolos
+```
+
+For a public demo that accepts no uploads, set `DOLOS_DEMO_ONLY=1` and leave `DOLOS_API_KEY` unset. Visitors can inspect and analyze the bundled synthetic examples.
+
+## How scoring works
+
+The [Rust API](backend/src/main.rs) validates statement rows and builds a directed graph of accounts and transfers. The [React workspace](frontend/src/App.tsx) links each transfer to the ledger and its source record.
+
+GraphSAGE summarizes the sender's and recipient's earlier incoming and outgoing transfers. XGBoost combines those summaries with transaction fields such as amount, currency, and payment format. TreeSHAP attributes the decision margin to groups of model inputs. Dolos labels rule-based findings, such as rapid pass-through, separately from model scores. Missing fields can leave a transfer ineligible for model scoring.
+
+## Evaluation
+
+The [evaluation notebook](dolos.ipynb) compares two models on the same chronological test split of 432 synthetic transfers, including 144 labeled routing transfers. Each prediction uses graph history from before the target hour.
 
 | Model | Average precision | Precision at 100 |
 | --- | ---: | ---: |
-| Transaction-only XGBoost baseline | 0.976999 | 0.980 |
+| Transaction-only XGBoost | 0.976999 | 0.980 |
 | GraphSAGE → XGBoost | 1.000000 | 1.000 |
 
-The baseline flagged an ordinary **$9,243 wire** from account `0016` to `0007`. Its amount and payment format resembled generated routing transfers, which may explain the false alert. The hybrid correctly left it unflagged and made no classification errors on this split. Because the training and test data came from the same generator, the scores tell us how well the model recognizes these simulated patterns. The live demo also uses weights trained on synthetic data. On regular PDFs, missing fields such as payment format can prevent model scoring. Dolos labels any fallback pattern checks separately.
-
-## What we'd do next
-
-- Run the same comparison on IBM AMLworld and measure false alerts and missed transfers on its held-out data.
-- Test extraction on more statement layouts and measure how often missing or incorrect fields prevent reliable scoring.
-
-## Sources
-
-- **Data:** [Our synthetic data generator](dolos/model_demo.py) and [IBM AMLworld](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml), an optional notebook dataset.
-- **Models and evaluation:** [GraphSAGE](https://arxiv.org/abs/1706.02216), [PyTorch](https://pytorch.org/), [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/), [XGBoost](https://xgboost.readthedocs.io/), [scikit-learn](https://scikit-learn.org/), [NumPy](https://numpy.org/), and [Polars](https://pola.rs/).
-- **AI tools:** We used [OpenAI Codex](https://openai.com/codex/) a little for UI design, with guidance from [Impeccable](https://impeccable.style/). Codex and [ChatGPT](https://chatgpt.com/) also assisted with implementation, debugging, tests, and documentation. [NVIDIA Nemotron via OpenRouter](https://openrouter.ai/nvidia/nemotron-3.5-super-vl:free) extracts transaction fields from PDFs that lack an embedded export.
-- **App and documents:** [React](https://react.dev/), [TanStack Query](https://tanstack.com/query), [React Flow](https://reactflow.dev/), [Dagre](https://github.com/dagrejs/dagre), [FastAPI](https://fastapi.tiangolo.com/), [pypdf](https://pypdf.readthedocs.io/), and [ReportLab](https://www.reportlab.com/).
+The training and test data came from the same generator. These results measure how well the models recognize the simulated patterns. Real-world accuracy remains unmeasured. Use Dolos scores to prioritize human review. A flag alone does not establish wrongdoing.

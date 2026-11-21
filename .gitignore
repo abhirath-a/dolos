@@ -32,3 +32,6 @@ video/public/fonts/
 video/src/media.generated.json
 media/*
 !media/README.md
+
+# Rust build output
+/backend/target/

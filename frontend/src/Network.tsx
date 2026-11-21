@@ -17,14 +17,19 @@ import {
   type Node,
   type EdgeProps,
 } from "@xyflow/react";
-import dagre from "@dagrejs/dagre";
-import { graphEdgesForView } from "./domain";
+import {
+  computeNetworkLayout,
+  type Layout,
+  type LayoutInput,
+  type Point,
+} from "./networkLayout";
 import {
   Building2,
   UserRound,
   Landmark,
   Network as NetworkIcon,
   ArrowRight,
+  SlidersHorizontal,
 } from "lucide-react";
 import { label, money, type Graph, type Entity } from "./types";
 type EntityNode = Node<
@@ -33,46 +38,52 @@ type EntityNode = Node<
     flagged: boolean;
     focused: boolean;
     muted: boolean;
-    degree: number;
   },
   "entity"
 >;
-const EntityCard = memo(({ data }: NodeProps<EntityNode>) => {
-  const Icon =
-    data.entity.kind === "person"
-      ? UserRound
-      : data.entity.kind === "account"
-        ? Landmark
-        : Building2;
-  return (
-    <div
-      className={`graph-entity ${data.flagged ? "flagged" : ""} ${data.focused ? "focused" : ""} ${data.muted ? "muted" : ""}`}
-    >
-      <Handle id="in-left" type="target" position={Position.Left} />
-      <Handle id="in-right" type="target" position={Position.Right} />
-      <div className="entity-disc">
-        <Icon size={22} strokeWidth={1.5} />
-        {data.flagged && (
-          <span
-            className="entity-review-dot"
-            aria-label="Connected to a flagged edge"
-          />
-        )}
+const EntityCard = memo(
+  ({ data }: NodeProps<EntityNode>) => {
+    const Icon =
+      data.entity.kind === "person"
+        ? UserRound
+        : data.entity.kind === "account"
+          ? Landmark
+          : Building2;
+    return (
+      <div
+        className={`graph-entity ${data.flagged ? "flagged" : ""} ${data.focused ? "focused" : ""} ${data.muted ? "muted" : ""}`}
+      >
+        <Handle id="in-left" type="target" position={Position.Left} />
+        <Handle id="in-right" type="target" position={Position.Right} />
+        <div className="entity-disc">
+          <Icon size={22} strokeWidth={1.5} />
+          {data.flagged && (
+            <span
+              className="entity-review-dot"
+              aria-label="Connected to a flagged edge"
+            />
+          )}
+        </div>
+        <strong>{label(data.entity)}</strong>
+        <span>
+          {data.entity.kind === "person"
+            ? "Person"
+            : data.entity.kind === "account"
+              ? "Account"
+              : data.entity.kind?.replaceAll("_", " ") || "Entity"}
+        </span>
+        <Handle id="out-right" type="source" position={Position.Right} />
+        <Handle id="out-left" type="source" position={Position.Left} />
       </div>
-      <strong>{label(data.entity)}</strong>
-      <span>
-        {data.entity.kind === "person"
-          ? "Person"
-          : data.entity.kind === "account"
-            ? "Account"
-            : data.entity.kind?.replaceAll("_", " ") || "Entity"}
-      </span>
-      <Handle id="out-right" type="source" position={Position.Right} />
-      <Handle id="out-left" type="source" position={Position.Left} />
-    </div>
-  );
-});
-type Point = { x: number; y: number };
+    );
+  },
+  (previous, next) =>
+    previous.data.entity === next.data.entity &&
+    previous.data.flagged === next.data.flagged &&
+    previous.data.focused === next.data.focused &&
+    previous.data.muted === next.data.muted,
+);
+
 // Preserve Dagre's obstacle-aware routing, rounding only the corners. The old
 // midpoint quadratic discarded the layout and cut straight across other nodes.
 function roundedRoute(points: Point[]) {
@@ -116,16 +127,28 @@ function routeMidpoint(points: Point[]) {
 }
 function TransferEdge(props: EdgeProps) {
   const routed = props.data?.points as Point[] | undefined;
-  const points = [
-    { x: props.sourceX, y: props.sourceY },
-    ...(routed?.slice(1, -1) || []),
-    { x: props.targetX, y: props.targetY },
-  ];
-  const midpoint = routeMidpoint(points);
+  const { sourceX, sourceY, targetX, targetY } = props;
+  const points = useMemo(
+    () => [
+      { x: sourceX, y: sourceY },
+      ...(routed?.slice(1, -1) || []),
+      { x: targetX, y: targetY },
+    ],
+    [routed, sourceX, sourceY, targetX, targetY],
+  );
+  const path = useMemo(() => roundedRoute(points), [points]);
+  const midpoint = props.data?.showLabel ? routeMidpoint(points) : undefined;
   return (
     <>
-      <BaseEdge {...props} path={roundedRoute(points)} interactionWidth={28} />
-      {props.data?.showLabel && (
+      <BaseEdge
+        id={props.id}
+        path={path}
+        style={props.style}
+        markerStart={props.markerStart}
+        markerEnd={props.markerEnd}
+        interactionWidth={28}
+      />
+      {midpoint && (
         <EdgeLabelRenderer>
           <div
             className={`transfer-label ${props.data?.flagged ? "flagged" : ""} ${props.data?.active ? "active" : ""}`}
@@ -171,54 +194,69 @@ export default function Network({
   const [xScale, setXScale] = useState(1);
   const [yScale, setYScale] = useState(1);
   const [interestOnly, setInterestOnly] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
   useEffect(() => {
     if (!flags.size) setInterestOnly(false);
   }, [flags.size]);
-  const visible = useMemo(
-    () =>
-      graphEdgesForView(graph, flags, onlyFlags, context, pinned, contextOnly),
-    [graph, onlyFlags, flags, contextOnly, context, pinned],
-  );
-  const arranged = useMemo(() => {
-    const connected = new Set(visible.flatMap((e) => [e.source, e.target]));
-    const ns = graph.nodes.filter(
-      (n) => connected.has(n.id) || (!onlyFlags && !contextOnly),
+  const filterFlags = onlyFlags ? flags : undefined;
+  const filterContext = contextOnly ? context : undefined;
+  const filterPin = contextOnly ? pinned : undefined;
+  const visible = useMemo(() => {
+    if (filterContext)
+      return graph.edges.filter(
+        (e) => filterContext.has(e.id) || e.id === filterPin,
+      );
+    if (filterFlags) return graph.edges.filter((e) => filterFlags.has(e.id));
+    return graph.edges;
+  }, [graph.edges, filterContext, filterFlags, filterPin]);
+  const topology = useMemo(() => {
+    const connected =
+      onlyFlags || contextOnly
+        ? new Set(visible.flatMap((e) => [e.source, e.target]))
+        : null;
+    const entities = graph.nodes.filter(
+      (n) => !connected || connected.has(n.id),
     );
-    const layout = new dagre.graphlib.Graph({ multigraph: true });
-    layout.setGraph({
-      rankdir: "LR",
-      nodesep: 90 * yScale,
-      ranksep: 165 * xScale,
-      edgesep: 30,
-      marginx: 70,
-      marginy: 80,
+    const labels = new Map(entities.map((n) => [n.id, label(n)]));
+    const edgeDetails = visible.map((e) => {
+      const amount = money(e);
+      return {
+        edge: e,
+        amount,
+        ariaLabel: `${labels.get(e.source)} to ${labels.get(e.target)}: ${amount}`,
+      };
     });
-    layout.setDefaultEdgeLabel(() => ({}));
-    ns.forEach((n) => layout.setNode(n.id, { width: 150, height: 96 }));
-    // Lay out every transfer: multigraph routes separate parallel and reverse
-    // transfers rather than drawing all of them on the same invented curve.
-    visible.forEach((e) =>
-      layout.setEdge(
-        e.source,
-        e.target,
-        { width: 100, height: 24, labelpos: "c" },
-        e.id,
-      ),
-    );
-    dagre.layout(layout);
     return {
-      ns,
-      positions: new Map(ns.map((n) => [n.id, layout.node(n.id)])),
+      entities,
+      labels,
+      edgeDetails,
+      input: {
+        ids: entities.map((n) => n.id),
+        edges: visible.map(({ id, source, target }) => ({
+          id,
+          source,
+          target,
+        })),
+        dense: visible.length > 120 || entities.length > 80,
+      },
+    };
+  }, [graph.nodes, visible, onlyFlags, contextOnly]);
+  const layout = useNetworkLayout(topology.input);
+  const arranged = useMemo(() => {
+    if (!layout) return null;
+    if (xScale === 1 && yScale === 1) return layout;
+    const scale = ({ x, y }: Point) => ({ x: x * xScale, y: y * yScale });
+    return {
+      positions: new Map(
+        Array.from(layout.positions, ([id, point]) => [id, scale(point)]),
+      ),
       routes: new Map(
-        visible.map((e) => [
-          e.id,
-          layout.edge({ v: e.source, w: e.target, name: e.id })
-            .points as Point[],
-        ]),
+        Array.from(layout.routes, ([id, route]) => [id, route.map(scale)]),
       ),
     };
-  }, [graph, visible, onlyFlags, contextOnly, xScale, yScale]);
-  const { nodes, edges } = useMemo(() => {
+  }, [layout, xScale, yScale]);
+  const nodes = useMemo(() => {
+    if (!arranged) return [];
     const flaggedNodes = new Set(
       visible
         .filter((e) => flags.has(e.id))
@@ -241,107 +279,129 @@ export default function Network({
               .flatMap((e) => [e.source, e.target]),
           ])
         : null;
-    return {
-      nodes: arranged.ns.map((n) => ({
-        id: n.id,
-        type: "entity",
-        ariaLabel: label(n),
-        position: {
-          x: arranged.positions.get(n.id)!.x - 75,
-          y: arranged.positions.get(n.id)!.y - 48,
-        },
-        data: {
-          entity: n,
-          flagged: flaggedNodes.has(n.id),
-          focused: focus === n.id,
-          muted:
-            (interestOnly &&
-              !flaggedNodes.has(n.id) &&
-              n.id !== selectedEdge?.source &&
-              n.id !== selectedEdge?.target) ||
-            (!!search &&
-              !label(n).toLowerCase().includes(search.toLowerCase())) ||
-            (!interestOnly && !!highlightedNodes && !highlightedNodes.has(n.id)),
-          degree: visible.filter((e) => e.source === n.id || e.target === n.id)
-            .length,
-        },
-      })),
-      edges: visible.map((e) => {
-        const route = arranged.routes.get(e.id)!;
-        const sourcePosition = arranged.positions.get(e.source)!;
-        const targetPosition = arranged.positions.get(e.target)!;
-        const sourceSide = route[0].x < sourcePosition.x ? "left" : "right";
-        const targetSide =
-          route[route.length - 1].x < targetPosition.x ? "left" : "right";
-        const incident = !!focus && (e.source === focus || e.target === focus);
-        const dimmed = interestOnly
-          ? !flags.has(e.id) && e.id !== selected
-          : focus
-            ? !incident
-            : !!selected &&
-              e.id !== selected &&
-              e.id !== pinned &&
-              !context.has(e.id);
-        const isContext = context.has(e.id),
-          flag = flags.has(e.id),
-          hot = e.id === selected || e.id === pinned || flag || incident;
-        const color =
-          e.id === selected
-            ? "#e4ff45"
-            : e.id === pinned || flag
-              ? "#f07860"
-              : isContext
-                ? "#88adff"
-                : e.id === selected || incident
-                  ? "#c1d6ed"
-                  : "#7c929f";
-        return {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          type: "transfer",
-          sourceHandle: `out-${sourceSide}`,
-          targetHandle: `in-${targetSide}`,
-          zIndex: e.id === selected ? 10 : hot ? 5 : 0,
-          ariaLabel: `${label(graph.nodes.find((n) => n.id === e.source))} to ${label(graph.nodes.find((n) => n.id === e.target))}: ${money(e)}`,
-          label: money(e),
-          data: {
-            points: route,
-            showLabel: interestOnly
-              ? flag || e.id === selected
-              : hot || visible.length <= 12,
-            flagged: flag,
-            hot,
-            active: e.id === selected,
-          },
-          style: {
-            stroke: color,
-            strokeWidth:
-              e.id === selected ? 5 : hot ? 2.5 : isContext ? 1.8 : 1.1,
-            strokeDasharray: isContext && !hot ? "5 5" : undefined,
-            opacity: dimmed ? (interestOnly ? 0.08 : 0.2) : 1,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color,
-            width: 20,
-            height: 20,
-          },
-        };
-      }),
-    };
+    const query = search.toLowerCase();
+    return topology.entities.map((n) => ({
+      id: n.id,
+      type: "entity",
+      ariaLabel: topology.labels.get(n.id),
+      position: {
+        x: arranged.positions.get(n.id)!.x - 75,
+        y: arranged.positions.get(n.id)!.y - 48,
+      },
+      data: {
+        entity: n,
+        flagged: flaggedNodes.has(n.id),
+        focused: focus === n.id,
+        muted:
+          (interestOnly &&
+            !flaggedNodes.has(n.id) &&
+            n.id !== selectedEdge?.source &&
+            n.id !== selectedEdge?.target) ||
+          (!!search &&
+            !topology.labels.get(n.id)!.toLowerCase().includes(query)) ||
+          (!interestOnly && !!highlightedNodes && !highlightedNodes.has(n.id)),
+      },
+    }));
   }, [
     arranged,
-    graph,
+    topology,
     visible,
     flags,
     selected,
     focus,
     search,
     context,
+    interestOnly,
+  ]);
+
+  const edges = useMemo(() => {
+    if (!arranged) return [];
+    return topology.edgeDetails.map(({ edge: e, amount, ariaLabel }) => {
+      const route = arranged.routes.get(e.id)!;
+      const sourcePosition = arranged.positions.get(e.source)!;
+      const targetPosition = arranged.positions.get(e.target)!;
+      const sourceSide = route[0].x < sourcePosition.x ? "left" : "right";
+      const targetSide =
+        route[route.length - 1].x < targetPosition.x ? "left" : "right";
+      const incident = !!focus && (e.source === focus || e.target === focus);
+      const dimmed = interestOnly
+        ? !flags.has(e.id) && e.id !== selected
+        : focus
+          ? !incident
+          : !!selected &&
+            e.id !== selected &&
+            e.id !== pinned &&
+            !context.has(e.id);
+      const isContext = context.has(e.id),
+        flag = flags.has(e.id),
+        hot = e.id === selected || e.id === pinned || flag || incident;
+      const color =
+        e.id === selected
+          ? "#e4ff45"
+          : e.id === pinned || flag
+            ? "#f07860"
+            : isContext
+              ? "#88adff"
+              : e.id === selected || incident
+                ? "#c1d6ed"
+                : "#7c929f";
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: "transfer",
+        sourceHandle: `out-${sourceSide}`,
+        targetHandle: `in-${targetSide}`,
+        zIndex: e.id === selected ? 10 : hot ? 5 : 0,
+        ariaLabel,
+        label: amount,
+        data: {
+          points: route,
+          showLabel: topology.input.dense
+            ? e.id === selected || e.id === pinned
+            : interestOnly
+              ? flag || e.id === selected
+              : hot || visible.length <= 12,
+          flagged: flag,
+          active: e.id === selected,
+        },
+        style: {
+          stroke: color,
+          strokeWidth:
+            e.id === selected ? 5 : hot ? 2.5 : isContext ? 1.8 : 1.1,
+          strokeDasharray: isContext && !hot ? "5 5" : undefined,
+          opacity: dimmed ? (interestOnly ? 0.08 : 0.2) : 1,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color,
+          width: 20,
+          height: 20,
+        },
+      };
+    });
+  }, [
+    arranged,
+    topology,
+    visible,
+    flags,
+    selected,
+    focus,
+    context,
     pinned,
     interestOnly,
   ]);
+  if (!arranged && topology.entities.length) {
+    return (
+      <div className="canvas-empty" role="status">
+        <NetworkIcon size={32} />
+        <h3>Arranging the network</h3>
+        <p>
+          {topology.entities.length} entities · {visible.length} transfers
+        </p>
+      </div>
+    );
+  }
   if (!nodes.length)
     return (
       <div className="canvas-empty">
@@ -361,7 +421,10 @@ export default function Network({
     );
   return (
     <ReactFlow
-      key={graph.nodes.map((n) => n.id).join("|") + onlyFlags + contextOnly}
+      key={
+        topology.entities.map((n) => n.id).join("|") + onlyFlags + contextOnly
+      }
+      className={topology.input.dense ? "dense-network" : undefined}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -380,63 +443,74 @@ export default function Network({
       nodesConnectable={false}
       onlyRenderVisibleElements
       colorMode="dark"
-      proOptions={{ hideAttribution: true }}
     >
       <Panel
         position="top-left"
         className="graph-scale-controls nodrag nopan"
-        aria-label="Graph spacing"
+        aria-label="Network display"
       >
-        <button
-          type="button"
-          aria-pressed={interestOnly}
-          disabled={!flags.size}
-          onClick={() => setInterestOnly((value) => !value)}
-          title={
-            flags.size
-              ? "Emphasize flagged transfers and their connected entities"
-              : "Run analysis to find points of interest"
-          }
-        >
-          {interestOnly
-            ? "Show all highlights"
-            : "Highlight points of interest"}
-        </button>
-        <label>
-          X scale{" "}
-          <input
-            aria-label="Horizontal graph scale"
-            type="range"
-            min="0.5"
-            max="3"
-            step="0.1"
-            value={xScale}
-            onChange={(event) => setXScale(Number(event.target.value))}
-          />
-          <output>{xScale.toFixed(1)}×</output>
-        </label>
-        <label>
-          Y scale{" "}
-          <input
-            aria-label="Vertical graph scale"
-            type="range"
-            min="0.5"
-            max="3"
-            step="0.1"
-            value={yScale}
-            onChange={(event) => setYScale(Number(event.target.value))}
-          />
-          <output>{yScale.toFixed(1)}×</output>
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            setXScale(1);
-            setYScale(1);
-          }}
-        >
-          Reset spacing
-        </button>
+        <details className="graph-layout">
+          <summary>
+            <SlidersHorizontal size={14} />
+            Layout
+          </summary>
+          <div className="graph-layout-controls">
+            <label>
+              X scale{" "}
+              <input
+                aria-label="Horizontal graph scale"
+                type="range"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={xScale}
+                onChange={(event) => setXScale(Number(event.target.value))}
+              />
+              <output>{xScale.toFixed(1)}×</output>
+            </label>
+            <label>
+              Y scale{" "}
+              <input
+                aria-label="Vertical graph scale"
+                type="range"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={yScale}
+                onChange={(event) => setYScale(Number(event.target.value))}
+              />
+              <output>{yScale.toFixed(1)}×</output>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setXScale(1);
+                setYScale(1);
+              }}
+            >
+              Reset spacing
+            </button>
+            {topology.input.dense && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showOverview}
+                  onChange={(event) => setShowOverview(event.target.checked)}
+                />
+                Show minimap
+              </label>
+            )}
+          </div>
+        </details>
+        {flags.size > 0 && (
+          <button
+            type="button"
+            aria-pressed={interestOnly}
+            onClick={() => setInterestOnly((value) => !value)}
+          >
+            Emphasize flags
+          </button>
+        )}
       </Panel>
       <FocusViewport
         id={focus}
@@ -445,16 +519,60 @@ export default function Network({
       />
       <Background color="#3b4752" gap={28} size={1} />
       <Controls showInteractive={false} />
-      <MiniMap
-        pannable
-        zoomable
-        nodeColor={(n) =>
-          (n.data as EntityNode["data"]).flagged ? "#ee8069" : "#82929d"
-        }
-        maskColor="#15212ac9"
-      />
+      {(!topology.input.dense || showOverview) && (
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor={(n) =>
+            (n.data as EntityNode["data"]).flagged ? "#ee8069" : "#82929d"
+          }
+          maskColor="#15212ac9"
+        />
+      )}
     </ReactFlow>
   );
+}
+
+function useNetworkLayout(input: LayoutInput) {
+  const immediate = useMemo(
+    () => (input.dense ? null : computeNetworkLayout(input)),
+    [input],
+  );
+  const [computed, setComputed] = useState<{
+    input: LayoutInput;
+    layout: Layout;
+  }>();
+  useEffect(() => {
+    if (!input.dense) return;
+    let worker: Worker | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const fallback = () => {
+      worker?.terminate();
+      timer = setTimeout(
+        () => setComputed({ input, layout: computeNetworkLayout(input) }),
+        0,
+      );
+    };
+    try {
+      worker = new Worker(
+        new URL("./networkLayout.worker.ts", import.meta.url),
+        { type: "module" },
+      );
+      worker.onmessage = (event: MessageEvent<Layout>) => {
+        setComputed({ input, layout: event.data });
+        worker?.terminate();
+      };
+      worker.onerror = fallback;
+      worker.postMessage(input);
+    } catch {
+      fallback();
+    }
+    return () => {
+      worker?.terminate();
+      clearTimeout(timer);
+    };
+  }, [input]);
+  return immediate ?? (computed?.input === input ? computed.layout : null);
 }
 
 function FocusViewport({

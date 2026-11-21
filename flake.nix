@@ -9,7 +9,11 @@
           let pkgs = import nixpkgs { inherit system; };
           in {
             default = pkgs.mkShell {
-              packages = [ pkgs.nodejs_26 pkgs.pnpm pkgs.uv ];
+              packages = with pkgs; [
+                nodejs_26 pnpm uv
+                cargo rustc rustfmt clippy
+                clang cmake pkg-config poppler-utils
+              ];
               # The macOS XGBoost wheel needs OpenMP; Linux CPU wheels bundle it.
               shellHook = pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
                 export DYLD_LIBRARY_PATH="${pkgs.llvmPackages.openmp}/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"

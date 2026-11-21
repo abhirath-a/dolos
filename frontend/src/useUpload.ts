@@ -65,7 +65,7 @@ export function useUpload(
         onAccepted(jobId.current, batch.id);
       }
       setStatus(
-        "All batches accepted. Document processing continues in the background.",
+        "All batches accepted. Open the investigation to review document status.",
       );
     } catch (e) {
       if (controller.current.signal.aborted)

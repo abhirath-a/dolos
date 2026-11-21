@@ -158,13 +158,21 @@ export default function App() {
   const health = useQuery({
     queryKey: ["health"],
     queryFn: () =>
-      api<{ model_configured: boolean; available_models?: string[] }>(
-        "/health",
-      ),
+      api<{
+        model_configured: boolean;
+        available_models?: string[];
+        uploads_enabled?: boolean;
+      }>("/health"),
     retry: false,
     staleTime: 30000,
     refetchInterval: 30000,
   });
+  const uploadsEnabled = health.data?.uploads_enabled !== false;
+  useEffect(() => {
+    if (uploadsEnabled) return;
+    if (selection.startsWith("investigation:")) setSelection("demo");
+    if (view === "upload") setView("workspace");
+  }, [uploadsEnabled, selection, view]);
   const demoStatus = useQuery({
     queryKey: ["demo-status"],
     queryFn: () => api<{ live_available: boolean }>("/demo/model/status"),
@@ -352,6 +360,7 @@ export default function App() {
       const first =
         response.model.scores?.find((s) => s.explanation)?.transaction_id ||
         response.findings[0]?.edge_id ||
+        response.model.scores?.[0]?.transaction_id ||
         null;
       const clicked = requestedEdge.current;
       const scored = response.model.scores?.some(
@@ -549,6 +558,9 @@ export default function App() {
   }
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#workspace">
+        Skip to workspace
+      </a>
       <header className="app-header">
         <button
           className="brand-button"
@@ -556,7 +568,6 @@ export default function App() {
           onClick={() => choose("demo")}
         >
           <Brand />
-          <span className="brand-slogan">Follow the Money...</span>
         </button>
         <label className="investigation-picker">
           <FolderOpen size={16} />
@@ -575,7 +586,7 @@ export default function App() {
                   </option>
                 ))}
             </optgroup>
-            {!!investigations.length && (
+            {uploadsEnabled && !!investigations.length && (
               <optgroup label="Your investigations">
                 {investigations.map((i) => (
                   <option key={i.id} value={`investigation:${i.id}`}>
@@ -595,7 +606,7 @@ export default function App() {
           </button>
         )}
         <div className="header-navigation">
-          <Help />
+          <Help onAbout={() => setView("about")} />
           <button
             onClick={() =>
               setView(view === "workspace" ? "about" : "workspace")
@@ -604,32 +615,45 @@ export default function App() {
             {view === "workspace" ? "How it works" : "Back to graph"}
           </button>
         </div>
-        <button
-          className="button secondary small upload-entry"
-          aria-label={
-            upload.running ? "View active upload" : "Upload statements"
-          }
-          onClick={openUpload}
-        >
-          {upload.running ? (
-            <LoaderCircle className="spin" size={15} />
-          ) : (
-            <Upload size={15} />
-          )}
-          <span className="upload-entry-label">
-            {upload.running ? "View upload" : "Upload statements"}
-          </span>
-        </button>
+        {uploadsEnabled && (
+          <button
+            className="button secondary small upload-entry"
+            aria-label={
+              upload.running ? "View active upload" : "Upload statements"
+            }
+            onClick={openUpload}
+          >
+            {upload.running ? (
+              <LoaderCircle className="spin" size={15} />
+            ) : (
+              <Upload size={15} />
+            )}
+            <span className="upload-entry-label">
+              {upload.running ? "View upload" : "Upload statements"}
+            </span>
+          </button>
+        )}
       </header>
       <div className="shell-body">
-        <main className="main-content">
+        <main id="workspace" tabIndex={-1} className="main-content">
           {view === "about" ? (
             <div className="about-page">
-              <h1>Look beyond a single transaction.</h1>
+              <h1>About Dolos</h1>
               <p className="about-lead">
-                Dolos connects financial records into a directional graph, then
-                makes the analysis inspectable.
+                A transaction investigation tool that traces a model score back
+                to the transfers and account history behind it.
               </p>
+              <button className="button primary about-demo-action" onClick={() => choose("demo")}>
+                Open the demo
+                <ArrowRight size={16} />
+              </button>
+              <nav className="project-links" aria-label="Project resources">
+                <a href="https://github.com/abhirath-a/dolos">Source code</a>
+                <a href="https://github.com/abhirath-a/dolos/blob/main/dolos.ipynb">
+                  Evaluation notebook
+                </a>
+                <a href="https://youtu.be/HR9kh6V0AYs">Demo video</a>
+              </nav>
               <section>
                 <NetworkIcon size={27} />
                 <div>
@@ -669,17 +693,12 @@ export default function App() {
               <div className="about-demo-note">
                 <Info size={19} />
                 <p>
-                  The bundled graph model demonstration uses generated teaching
-                  data and recalculates model predictions on each run. It is not
-                  a real investigation or a real-world accuracy benchmark.
-                  Compatible hybrid artifacts and inference dependencies must be
-                  installed on the API.
+                  The teaching examples use synthetic transfers. The Rust API
+                  runs the ONNX models fresh each time. A flag gives an analyst
+                  a transfer to review. Model performance here describes the
+                  synthetic split.
                 </p>
               </div>
-              <button className="button primary" onClick={() => choose("demo")}>
-                Explore the graph model
-                <ArrowRight size={16} />
-              </button>
             </div>
           ) : view === "upload" ? (
             <>
@@ -705,31 +724,62 @@ export default function App() {
           ) : (
             <>
               <div className="workspace-heading">
-                <div>
-                  <h1>
-                    The anti-money laundering & unauthorized transactions model
-                    of tomorrow.
-                  </h1>
+                <div className="workspace-identity">
+                  <h1>{title}</h1>
                   <div className="workspace-description">
-                    <span
-                      className={`dataset-tag ${mode === "demo" ? "synthetic" : ""}`}
-                    >
-                      {sourceLabel}
-                    </span>
-                    {mode === "historical" && <span>{currentCase?.hook}</span>}
-                    {mode === "demo" && <span>{activeDemo?.description}</span>}
+                    <span>{sourceLabel}</span>
+                    {mode === "demo" && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {liveDemo
+                            ? "GraphSAGE → XGBoost"
+                            : demoStatus.isPending
+                              ? "Connecting to the model…"
+                              : "Live model unavailable"}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <button
-                  aria-label="Export visible relationships"
-                  className="button secondary export-button"
-                  disabled={!baseGraph.edges.length}
-                  onClick={exportVisible}
-                >
-                  <Download size={15} />
-                  <span>Export visible</span>
-                </button>
+                <div className="analysis-actions">
+                  <button
+                    aria-label="Export visible relationships"
+                    className="button secondary export-button"
+                    disabled={!baseGraph.edges.length}
+                    onClick={exportVisible}
+                  >
+                    <Download size={15} />
+                    <span>Export visible</span>
+                  </button>
+                  <button
+                    className="button primary"
+                    disabled={
+                      isAnalyzing ||
+                      loadingGraph ||
+                      !baseGraph.edges.length ||
+                      processing ||
+                      pendingBatches
+                    }
+                    onClick={() => run()}
+                  >
+                    {isAnalyzing ? (
+                      <LoaderCircle className="spin" size={15} />
+                    ) : mode === "historical" ? (
+                      <BookOpen size={15} />
+                    ) : (
+                      <Play size={14} fill="currentColor" />
+                    )}
+                    {isAnalyzing ? "Analyzing…" : action}
+                  </button>
+                </div>
               </div>
+              {analysis && (
+                <a className="analysis-jump" href="#investigation-details">
+                  View analysis
+                  <ArrowRight size={15} />
+                </a>
+              )}
               {mode === "historical" && currentCase && (
                 <div className="case-provenance">
                   <div>
@@ -763,70 +813,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <div className="analysis-toolbar">
-                <div className="method-control">
-                  <span className="method-icon">
-                    {mode === "historical" ? (
-                      <BookOpen size={17} />
-                    ) : (
-                      <NetworkIcon size={18} />
-                    )}
-                  </span>
-                  {mode === "historical" ? (
-                    <strong>Source evidence review</strong>
-                  ) : mode === "uploaded" &&
-                    (!hasCanonical || !eligibleModels.length) ? (
-                    <strong>Pattern checks</strong>
-                  ) : (
-                    <strong>GraphSAGE → XGBoost</strong>
-                  )}
-                  <span className="method-description">
-                    {mode === "historical"
-                      ? "Citations, not model predictions"
-                      : mode === "demo"
-                        ? "One hybrid decision · credit for each stage"
-                        : trainedAvailable
-                          ? "Trained model available"
-                          : "For partial or unscored records"}
-                  </span>
-                </div>
-                <div className="analysis-actions">
-                  <span
-                    className={`availability ${mode === "demo" && !liveDemo ? "recorded" : ""}`}
-                  >
-                    <i />
-                    {mode === "historical"
-                      ? "Public sources"
-                      : mode === "demo"
-                        ? liveDemo
-                          ? "Live inference available"
-                          : "Live inference not ready"
-                        : trainedAvailable
-                          ? "Live inference available"
-                          : "Pattern analysis available"}
-                  </span>
-                  <button
-                    className="button primary"
-                    disabled={
-                      isAnalyzing ||
-                      loadingGraph ||
-                      !baseGraph.edges.length ||
-                      processing ||
-                      pendingBatches
-                    }
-                    onClick={() => run()}
-                  >
-                    {isAnalyzing ? (
-                      <LoaderCircle className="spin" size={15} />
-                    ) : mode === "historical" ? (
-                      <BookOpen size={15} />
-                    ) : (
-                      <Play size={14} fill="currentColor" />
-                    )}
-                    {isAnalyzing ? "Analyzing…" : action}
-                  </button>
-                </div>
-              </div>
               {mode === "uploaded" && !trainedAvailable && hasCanonical && (
                 <div className="inline-notice">
                   <Info size={15} />
@@ -984,19 +970,23 @@ export default function App() {
                     </div>
                   )}
                   <div className="canvas-bottom">
-                    <div className="graph-legend">
+                    <div className="graph-legend" aria-label="Transfer legend">
                       <span>
                         <i className="legend-line" />
                         Transfer
                       </span>
-                      <span>
-                        <i className="legend-line context" />
-                        Model context
-                      </span>
-                      <span>
-                        <i className="legend-line flagged" />
-                        Flagged for review
-                      </span>
+                      {context.size > 0 && (
+                        <span>
+                          <i className="legend-line context" />
+                          Model context
+                        </span>
+                      )}
+                      {flags.size > 0 && (
+                        <span>
+                          <i className="legend-line flagged" />
+                          Flagged for review
+                        </span>
+                      )}
                     </div>
                     <span className="canvas-count">
                       {graph.nodes.length} entities · {graph.edges.length}{" "}

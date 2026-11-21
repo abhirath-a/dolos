@@ -63,8 +63,14 @@ export default function UploadPanel({
             </span>
             <strong>Drop files here</strong>
             <span>or browse files</span>
-            <small>CSV or JSON · 25 MiB per file · large selections split automatically</small>
+            <small>PDF, CSV, or JSON · 25 MiB per file</small>
           </button>
+          {upload.files.length === 0 && (
+            <p className="sample-upload">
+              <a href="/dolos-video-statements.zip" download>Download sample PDFs</a>
+              <span> Unzip the archive, then upload the four synthetic statements.</span>
+            </p>
+          )}
           <input
             ref={input}
             className="sr-only"
@@ -164,12 +170,11 @@ export default function UploadPanel({
             )}
           </div>
           <p className="upload-note">
-            You can leave this page while uploads continue. Cancelling stops remaining uploads;
-            statements already accepted can continue processing.
+            Uploads continue while you use the workspace. Cancelling keeps batches you already uploaded.
           </p>
           {accepted.length > 0 && (
             <section className="document-list">
-              <h2>Processing documents</h2>
+              <h2>Documents</h2>
               {accepted.map((d) => (
                 <div key={d.id}>
                   <FileText size={17} />
@@ -200,13 +205,11 @@ export default function UploadPanel({
           )}
         </section>
         <div className="upload-help">
-          <p className="provider-note">Ordinary CSVs use your configured extraction provider. </p>
           <details>
             <summary>What happens to my documents?</summary>
             <p>
-              Uploaded files stay in your configured storage. CSV text or page images may be sent to
-              your configured extraction provider. No public file links are created. Retention and
-              provider settings depend on your deployment.
+              Uploaded files stay in your configured storage. PDFs without an embedded export may
+              be sent to the configured extraction provider.
             </p>
           </details>
           <details>

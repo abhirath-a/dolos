@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dolos"
 version = "0.1.0"
-description = "Queued statement ingestion and temporal transaction graph API"
+description = "Dolos model training and Python reference implementation"
 requires-python = ">=3.9"
 dependencies = [
     "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "python-multipart>=0.0.18",
@@ -22,7 +22,6 @@ ml = ["numpy==2.0.2", "polars==1.32.3", "torch==2.8.0", "torch-geometric==2.6.1"
 test = ["pytest>=8,<9", "httpx>=0.27,<1"]
 
 [project.scripts]
-dolos-worker = "dolos.worker:main"
 dolos-train = "dolos.train:main"
 dolos-demo = "dolos.demo:main"
 dolos-migrate = "dolos.migrate:main"
@@ -36,6 +35,3 @@ testpaths = ["tests"]
 
 [tool.setuptools.package-data]
 dolos = ["migrations/*.sql", "migrations/*.json", "demo_assets/*.json", "demo_assets/*.csv", "demo_assets/artifacts/*"]
-
-[tool.vercel]
-entrypoint = "dolos.api:app"

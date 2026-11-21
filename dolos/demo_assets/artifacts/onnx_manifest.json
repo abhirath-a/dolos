@@ -1,0 +1,15 @@
+{
+  "files": {
+    "graph_xgboost.json": "9ca52fd8686044d31aaf0eebbc41747a9ff57fd5aabcf158ab40fe97c0359882",
+    "graph_xgboost.onnx": "df095ed9b819146e3ca56da4b5d55d469680515525711a37a012e57fbf1ade1c",
+    "graphsage.npz": "a3b9431c27f1cc18703b7b487fdcb438502ff3ff692541e97d3c5cf9e399763f",
+    "graphsage_head.onnx": "48da963ddff9bf187d4cef553cf968ae07020f4f51cef992ecaab8bbc2a8d083",
+    "graphsage_layer0.onnx": "62fb012deadaafd6eee7a0922148f2b090bfa8389cafe919e8bb29dad1769a97",
+    "graphsage_layer1.onnx": "1d830e1b10aa48c9c6f8d54b8e229ca039f51d162da68c5235951214373ab2bf",
+    "hybrid_manifest.json": "0074600e773903b8124c8b5190a8d7dcdf62e0843d847b6eedae5fe03601a73c",
+    "hybrid_xgboost.json": "3a3701dfa9e5b459c4c01d27feb782d998b1cedfc3d8249f54da957f7f179d86",
+    "hybrid_xgboost.onnx": "a843577a75fbddc61a0c4fc80c40ac6d2f7eb08b36fa1abcd07fc0936cdb278d",
+    "manifest.json": "5959f57567e4f3b6664c734a2306530dcf5ba415ff45778ccfcefda22716360e"
+  },
+  "version": 1
+}

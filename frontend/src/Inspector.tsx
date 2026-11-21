@@ -84,7 +84,7 @@ export default function Inspector({
   const finding = analysis?.findings.find((f) => f.edge_id === selected);
   const [visibleFindings, setVisibleFindings] = useState(10);
   return (
-    <aside className={`inspector ${expanded ? "expanded" : ""}`} aria-label="Investigation details">
+    <aside id="investigation-details" tabIndex={-1} className={`inspector ${expanded ? "expanded" : ""}`} aria-label="Investigation details">
       <div className="inspector-top">
         <div className="inspector-tabs" role="tablist" aria-label="Investigation details">
           {tabs.map((name, index) => (
@@ -139,22 +139,21 @@ export default function Inspector({
                   {mode === "historical" ? "Reviewing source evidence" : "Running the hybrid"}
                 </h2>
                 <p>
-                  Waiting for the server’s analysis. Results appear when the actual request
-                  completes.
+                  You can continue exploring the graph while the model runs.
                 </p>
               </div>
             ) : !analysis ? (
               <div className="analysis-intro">
                 <h2>
                   {mode === "demo"
-                    ? "Inspect the hybrid decision."
+                    ? "Follow the score."
                     : mode === "historical"
                       ? "Inspect the source evidence."
                       : "Analyze your statements."}
                 </h2>
                 <p>
                   {mode === "demo"
-                    ? "Analyze once, then inspect the GraphSAGE neighborhood, XGBoost tree paths, and each input group’s credit for the final decision."
+                    ? "Choose Analyze network, then inspect a transfer to see the earlier activity and transaction fields that affected its score."
                     : mode === "historical"
                       ? "This is a reconstruction from public sources. Evidence review highlights cited relationships; it does not run an ML model on historical claims."
                       : "When processing finishes, analyze the network. Complete records support the hybrid pipeline; partial records use pattern checks."}
@@ -226,6 +225,50 @@ export default function Inspector({
                     )}
                   </section>
                 )}
+                {analysis.model.name === "hybrid" && prediction && componentCredits && (
+                  <section className="explanation-section hybrid-credit">
+                    <div className="explanation-heading">
+                      <GitBranch size={18} />
+                      <h3>Credit for this finding</h3>
+                    </div>
+                    <p>
+                      <strong>GraphSAGE:</strong> neighborhood encoder.{" "}
+                      <strong>XGBoost:</strong> final classifier and TreeSHAP attribution.
+                      Signed credits group the final tree model’s inputs; they are not separate
+                      model votes.
+                    </p>
+                    <dl className="evidence-facts">
+                      <div>
+                        <dt>Base margin</dt>
+                        <dd>{baseMargin?.toFixed(3)}</dd>
+                      </div>
+                      {componentCredits.map((component) => (
+                        <div key={component.name}>
+                          <dt>{component.name}</dt>
+                          <dd>
+                            {component.contribution >= 0 ? "+" : ""}
+                            {component.contribution.toFixed(3)}
+                          </dd>
+                        </div>
+                      ))}
+                      <div>
+                        <dt>Final decision</dt>
+                        <dd>{prediction?.score.toFixed(3)}</dd>
+                      </div>
+                    </dl>
+                    <p className="interpretation">
+                      Base margin + both component credits = final margin, before rounding.
+                      Credits describe this model decision, not criminal responsibility or which
+                      historical edge caused it.
+                    </p>
+                    {!explanation && (
+                      <p className="method-disclosure">
+                        Component credits are available for every score; detailed context and
+                        tree paths are included for the ten highest-ranked transfers.
+                      </p>
+                    )}
+                  </section>
+                )}
                 {(explanation?.kind === "graph_context" || explanation?.kind === "hybrid") && (
                   <section className="explanation-section">
                     <div className="explanation-heading">
@@ -250,50 +293,6 @@ export default function Inspector({
                           {dateLabel(new Date(explanation.cutoff_us / 1000).toISOString())}
                         </strong>
                       </div>
-                    )}
-                    {analysis.model.name === "hybrid" && prediction && componentCredits && (
-                      <section className="explanation-section hybrid-credit">
-                        <div className="explanation-heading">
-                          <GitBranch size={18} />
-                          <h3>Credit for this finding</h3>
-                        </div>
-                        <p>
-                          <strong>GraphSAGE:</strong> neighborhood encoder.{" "}
-                          <strong>XGBoost:</strong> final classifier and TreeSHAP attribution.
-                          Signed credits group the final tree model’s inputs; they are not separate
-                          model votes.
-                        </p>
-                        <dl className="evidence-facts">
-                          <div>
-                            <dt>Base margin</dt>
-                            <dd>{baseMargin?.toFixed(3)}</dd>
-                          </div>
-                          {componentCredits.map((component) => (
-                            <div key={component.name}>
-                              <dt>{component.name}</dt>
-                              <dd>
-                                {component.contribution >= 0 ? "+" : ""}
-                                {component.contribution.toFixed(3)}
-                              </dd>
-                            </div>
-                          ))}
-                          <div>
-                            <dt>Final decision</dt>
-                            <dd>{prediction?.score.toFixed(3)}</dd>
-                          </div>
-                        </dl>
-                        <p className="interpretation">
-                          Base margin + both component credits = final margin, before rounding.
-                          Credits describe this model decision, not criminal responsibility or which
-                          historical edge caused it.
-                        </p>
-                        {!explanation && (
-                          <p className="method-disclosure">
-                            Component credits are available for every score; detailed context and
-                            tree paths are included for the ten highest-ranked transfers.
-                          </p>
-                        )}
-                      </section>
                     )}
                     {[1, 2].map((hop) => {
                       const rows = contexts.filter((r) => r.hop === hop);
