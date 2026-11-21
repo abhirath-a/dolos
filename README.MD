@@ -67,6 +67,8 @@ docker run --rm -p 127.0.0.1:8000:8000 -v dolos-data:/app/data dolos
 
 For a public demo that accepts no uploads, set `DOLOS_DEMO_ONLY=1` and leave `DOLOS_API_KEY` unset. Visitors can inspect and analyze the bundled synthetic examples.
 
+The [Railway deployment](https://dolos-production.up.railway.app/) serves the frontend and Rust API together. For a separate Vercel frontend, set its project root to `frontend`. [The Vercel rewrite](frontend/vercel.json) forwards `/api/*` to Railway and keeps browser requests on the frontend's origin.
+
 ## How scoring works
 
 The [Rust API](backend/src/main.rs) validates statement rows and builds a directed graph of accounts and transfers. The [React workspace](frontend/src/App.tsx) links each transfer to the ledger and its source record.
